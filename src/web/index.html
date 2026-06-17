@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>grabr — Modern File Downloader</title>
+  <link rel="stylesheet" href="main.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header with logo and stats -->
+    <header>
+      <div class="logo-group">
+        <div class="logo-dot"></div>
+        <h1>grabr</h1>
+      </div>
+      
+      <div class="topbar-stats">
+        <div class="stat-item">
+          <span class="stat-label">Active Downloads</span>
+          <span id="active-count" class="stat-value">0</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Total Speed</span>
+          <span id="total-speed" class="stat-value">0 B/s</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button id="btn-clear-completed" class="btn btn-secondary" title="Clear completed jobs">
+            Clear Completed
+          </button>
+          <button id="btn-open-add" class="btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            Add Download
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Jobs Grid -->
+    <main>
+      <div id="jobs-grid" class="jobs-grid">
+        <!-- Job cards dynamically added here -->
+        <div class="empty-state">
+          <div class="empty-state-icon">↓</div>
+          <p>No downloads yet.</p>
+          <button id="btn-empty-add" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Add one now</button>
+        </div>
+      </div>
+
+      <!-- Job Detail & Chunk Panel (shown when a card is selected) -->
+      <div id="detail-panel" class="detail-panel">
+        <div class="detail-header">
+          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <h2 id="detail-title" style="font-size: 1.25rem; font-weight: 700;">ubuntu-24.04.iso</h2>
+            <p id="detail-subtitle" style="font-size: 0.8rem; color: var(--muted); font-family: var(--font-mono);"></p>
+          </div>
+          <button id="btn-close-detail" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
+            Close Details
+          </button>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <span class="stat-label">Chunk Downloads (Parallel Ranges)</span>
+          <div id="chunk-grid" class="chunk-grid">
+            <!-- Chunk progress cards dynamically added here -->
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Add Download Modal Overlay -->
+    <div id="add-modal-overlay" class="modal-overlay">
+      <div class="modal">
+        <h3 class="modal-title">New Download</h3>
+        
+        <div class="form-group">
+          <label class="form-label" for="download-url">File URL</label>
+          <input type="url" id="download-url" class="form-input form-input-mono" placeholder="https://example.com/largefile.zip" required autocomplete="off">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label" for="download-chunks">Parallel Chunks</label>
+            <input type="number" id="download-chunks" class="form-input" min="1" max="16" value="4">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="download-name">Filename (Optional)</label>
+            <input type="text" id="download-name" class="form-input" placeholder="Custom filename">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="download-output">Save Directory (Optional)</label>
+          <input type="text" id="download-output" class="form-input" placeholder="Defaults to config folder">
+        </div>
+
+        <div class="modal-actions">
+          <button id="btn-close-add" class="btn btn-secondary">Cancel</button>
+          <button id="btn-submit-download" class="btn">Start Download</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>

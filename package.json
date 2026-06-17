@@ -1,0 +1,26 @@
+{
+  "name": "grabr",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "mkdir -p src/server/static && cp src/web/index.html src/server/static/index.html && cp src/web/styles/main.css src/server/static/main.css && bun build src/web/main.ts --outdir src/server/static",
+    "start": "bun run src/server/index.ts",
+    "cli": "bun run src/cli/index.tsx"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/mime-types": "^3.0.1",
+    "@types/react": "^19.2.17"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "hono": "^4.12.25",
+    "ink": "^7.0.6",
+    "mime-types": "^3.0.2",
+    "nanoid": "^5.1.11",
+    "react": "^19.2.7"
+  }
+}
