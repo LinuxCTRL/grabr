@@ -1,6 +1,6 @@
 {
   "name": "@linuxctrl/grabr",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A modern, elegant file downloader — CLI & library for Bun and Node.js",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -61,6 +61,14 @@
     "bun": ">=1.0.0"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LinuxCTRL/grabr.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LinuxCTRL/grabr/issues"
+  },
+  "homepage": "https://github.com/LinuxCTRL/grabr#readme",
   "keywords": [
     "downloader",
     "cli",
