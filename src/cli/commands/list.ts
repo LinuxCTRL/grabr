@@ -27,7 +27,7 @@ export async function listCommand() {
   if (daemonJobs) {
     jobs = daemonJobs;
   } else {
-    jobs = listJobs();
+    jobs = await listJobs();
   }
 
   if (jobs.length === 0) {

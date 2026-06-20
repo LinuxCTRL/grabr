@@ -40,7 +40,7 @@ export async function clearCommand(args: string[]) {
   } else {
     // Offline Database fallback
     try {
-      clearCompletedJobs();
+      await clearCompletedJobs();
       console.log('Cleared completed jobs from database.');
     } catch (err: any) {
       console.error(`Failed to clear database jobs: ${err.message}`);

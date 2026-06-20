@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { loadConfig } from '../../core/config';
 
 async function isDaemonRunning(port = 7474): Promise<boolean> {
@@ -8,6 +9,17 @@ async function isDaemonRunning(port = 7474): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+function openBrowser(url: string) {
+  const os = process.platform;
+  if (os === 'darwin') {
+    spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
+  } else if (os === 'win32') {
+    spawn('cmd', ['/c', 'start', url], { stdio: 'ignore', detached: true }).unref();
+  } else {
+    spawn('xdg-open', [url], { stdio: 'ignore', detached: true }).unref();
   }
 }
 
@@ -28,18 +40,7 @@ export async function uiCommand() {
   console.log(`Opening Web UI in browser: ${url}`);
   
   try {
-    if (typeof (Bun as any).openInBrowser === 'function') {
-      await (Bun as any).openInBrowser(url);
-    } else {
-      const os = process.platform;
-      if (os === 'darwin') {
-        Bun.spawn(['open', url]);
-      } else if (os === 'win32') {
-        Bun.spawn(['cmd', '/c', 'start', url]);
-      } else {
-        Bun.spawn(['xdg-open', url]);
-      }
-    }
+    openBrowser(url);
   } catch (err: any) {
     console.error(`Failed to open browser: ${err.message}`);
     console.log(`Please open this URL manually: ${url}`);

@@ -38,9 +38,9 @@ export async function removeCommand(id: string) {
     }
   } else {
     // Offline Database fallback
-    const job = getJob(id);
+    const job = await getJob(id);
     if (job) {
-      deleteJob(id);
+      await deleteJob(id);
       deleteResumeState(id);
       console.log(`Removed job ${id} from database.`);
     } else {

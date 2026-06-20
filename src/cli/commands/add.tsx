@@ -33,7 +33,7 @@ export async function addCommand(args: string[]) {
       chunks = parseInt(args[++i] || `${config.defaultChunks}`, 10);
     } else if (arg === '--name' || arg === '-n') {
       filename = args[++i] || '';
-    } else if (!arg.startsWith('-') && !url) {
+    } else if (arg && !arg.startsWith('-') && !url) {
       url = arg;
     }
   }
@@ -85,7 +85,7 @@ export async function addCommand(args: string[]) {
     // Run Standalone Local Downloader
     console.log('Daemon is not running. Starting download in standalone mode...');
     const downloader = new Downloader();
-    downloader.start();
+    await downloader.start();
 
     try {
       await downloader.addJob(url, {

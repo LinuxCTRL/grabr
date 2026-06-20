@@ -43,7 +43,7 @@ export async function resumeCommand(id: string) {
   } else {
     // Offline Database fallback
     if (id === 'all') {
-      const jobs = listJobs();
+      const jobs = await listJobs();
       let count = 0;
       for (const job of jobs) {
         if (job.status === 'paused' || job.status === 'failed') {
@@ -51,21 +51,21 @@ export async function resumeCommand(id: string) {
           job.speed = 0;
           job.eta = -1;
           job.error = undefined;
-          updateJob(job);
+          await updateJob(job);
           saveResumeState(job);
           count++;
         }
       }
       console.log(`Resumed ${count} jobs (queued) in database.`);
     } else {
-      const job = getJob(id);
+      const job = await getJob(id);
       if (job) {
         if (job.status === 'paused' || job.status === 'failed') {
           job.status = 'queued';
           job.speed = 0;
           job.eta = -1;
           job.error = undefined;
-          updateJob(job);
+          await updateJob(job);
           saveResumeState(job);
           console.log(`Resumed job ${id} (queued) in database.`);
         } else {

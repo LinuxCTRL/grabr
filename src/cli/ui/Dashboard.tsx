@@ -26,7 +26,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
 
     async function loadInitialJobs() {
       if (mode === 'local') {
-        const localList = listJobs();
+        const localList = await listJobs();
         if (active) setJobs(localList);
       } else {
         try {
@@ -93,7 +93,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
       };
     } else if (mode === 'remote') {
       let ws: WebSocket | null = null;
-      let reconnectTimer: Timer | null = null;
+      let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
       function connectWS() {
         ws = new WebSocket(wsUrl);

@@ -1,19 +1,49 @@
 {
   "name": "grabr",
-  "module": "index.ts",
+  "version": "0.1.0",
+  "description": "A modern, elegant file downloader — CLI & library for Bun and Node.js",
   "type": "module",
-  "private": true,
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "grabr": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "mkdir -p src/server/static && cp src/web/index.html src/server/static/index.html && cp src/web/styles/main.css src/server/static/main.css && bun build src/web/main.ts --outdir src/server/static",
+    "build": "bun run build:web && bun run build:lib && bun run build:cli && bun run build:types",
+    "build:web": "mkdir -p src/server/static/fonts && cp src/assets/OperatorMonoLig-Book.otf src/server/static/fonts/OperatorMonoLig-Book.otf && cp src/web/index.html src/server/static/index.html && cp src/web/styles/main.css src/server/static/main.css && bun build src/web/main.ts --outdir src/server/static",
+    "build:lib": "bun build src/index.ts --outfile dist/index.js --target node --format esm && bun build src/index.ts --outfile dist/index.cjs --target node --format cjs",
+    "build:cli": "NODE_ENV=production bun build src/cli/index.tsx --outfile dist/cli.js --target node --format esm --define 'process.env.NODE_ENV=\"production\"' && sed -i 's|#!/usr/bin/env bun|#!/usr/bin/env node|' dist/cli.js",
+    "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist",
+    "prepublishOnly": "bun run build",
     "start": "bun run src/server/index.ts",
-    "cli": "bun run src/cli/index.tsx"
+    "cli": "bun run src/cli/index.tsx",
+    "dev": "bun run src/cli/index.tsx",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/mime-types": "^3.0.1",
-    "@types/react": "^19.2.17"
-  },
-  "peerDependencies": {
+    "@types/node": "^26.0.0",
+    "@types/react": "^19.2.17",
+    "@types/sql.js": "^1.4.11",
     "typescript": "^5"
   },
   "dependencies": {
@@ -21,6 +51,21 @@
     "ink": "^7.0.6",
     "mime-types": "^3.0.2",
     "nanoid": "^5.1.11",
-    "react": "^19.2.7"
-  }
+    "react": "^19.2.7",
+    "react-devtools-core": "^7.0.1",
+    "sql.js": "^1.14.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  },
+  "license": "MIT",
+  "keywords": [
+    "downloader",
+    "cli",
+    "file-downloader",
+    "download",
+    "http-downloader",
+    "chunked-download"
+  ]
 }

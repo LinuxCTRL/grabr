@@ -1,34 +1,95 @@
-import { Database } from 'bun:sqlite';
-import { mkdirSync } from 'fs';
+import type { SqlJsStatic, Database as SqlJsDatabase } from 'sql.js';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-// Ensure the state directory exists
 const stateDir = join(process.cwd(), '.grabr');
 mkdirSync(stateDir, { recursive: true });
 
 const dbPath = join(stateDir, 'grabr.db');
-const db = new Database(dbPath, { create: true });
 
-// Enable WAL mode for performance
-db.run('PRAGMA journal_mode = WAL;');
+let SQL: SqlJsStatic;
+let db: SqlJsDatabase;
+let initPromise: Promise<void> | null = null;
 
-// Initialize database schema
-db.run(`
-  CREATE TABLE IF NOT EXISTS jobs (
-    id TEXT PRIMARY KEY,
-    url TEXT NOT NULL,
-    filename TEXT NOT NULL,
-    destination TEXT NOT NULL,
-    total_bytes INTEGER DEFAULT 0,
-    downloaded_bytes INTEGER DEFAULT 0,
-    chunks TEXT DEFAULT '[]',   -- JSON string
-    status TEXT DEFAULT 'queued',
-    speed INTEGER DEFAULT 0,
-    eta INTEGER DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    error TEXT
-  )
-`);
+async function init(): Promise<void> {
+  if (db) return;
+  if (initPromise) return initPromise;
 
-export { db };
+  initPromise = (async () => {
+    const initSqlJs = (await import('sql.js')).default;
+    SQL = await initSqlJs();
+
+    if (existsSync(dbPath)) {
+      const buffer = readFileSync(dbPath);
+      db = new SQL.Database(buffer);
+    } else {
+      db = new SQL.Database();
+    }
+
+    db.run('PRAGMA journal_mode = WAL');
+    db.run(`
+      CREATE TABLE IF NOT EXISTS jobs (
+        id TEXT PRIMARY KEY,
+        url TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        destination TEXT NOT NULL,
+        total_bytes INTEGER DEFAULT 0,
+        downloaded_bytes INTEGER DEFAULT 0,
+        chunks TEXT DEFAULT '[]',
+        status TEXT DEFAULT 'queued',
+        speed INTEGER DEFAULT 0,
+        eta INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        error TEXT
+      )
+    `);
+
+    persistDb();
+  })();
+
+  return initPromise;
+}
+
+function persistDb(): void {
+  const data = db.export();
+  writeFileSync(dbPath, Buffer.from(data));
+}
+
+export async function queryRun(sql: string, params?: (number | string | Uint8Array | null)[]): Promise<void> {
+  await init();
+  db.run(sql, params);
+  persistDb();
+}
+
+export async function queryGet<T>(
+  sql: string,
+  params?: (number | string | Uint8Array | null)[]
+): Promise<T | undefined> {
+  await init();
+  const stmt = db.prepare(sql);
+  try {
+    if (params) stmt.bind(params);
+    return stmt.step() ? (stmt.getAsObject() as T) : undefined;
+  } finally {
+    stmt.free();
+  }
+}
+
+export async function queryAll<T>(
+  sql: string,
+  params?: (number | string | Uint8Array | null)[]
+): Promise<T[]> {
+  await init();
+  const stmt = db.prepare(sql);
+  try {
+    if (params) stmt.bind(params);
+    const results: T[] = [];
+    while (stmt.step()) {
+      results.push(stmt.getAsObject() as T);
+    }
+    return results;
+  } finally {
+    stmt.free();
+  }
+}

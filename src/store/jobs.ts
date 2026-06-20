@@ -1,4 +1,4 @@
-import { db } from './db';
+import { queryRun, queryGet, queryAll } from './db';
 import type { DownloadJob, JobStatus, ChunkInfo } from '../core/types';
 
 interface JobRow {
@@ -35,80 +35,65 @@ function mapRowToJob(row: JobRow): DownloadJob {
   };
 }
 
-export function createJob(job: DownloadJob): void {
-  const query = db.prepare(`
-    INSERT INTO jobs (id, url, filename, destination, total_bytes, downloaded_bytes, chunks, status, speed, eta, created_at, updated_at, error)
-    VALUES ($id, $url, $filename, $destination, $total_bytes, $downloaded_bytes, $chunks, $status, $speed, $eta, $created_at, $updated_at, $error)
-  `);
-
-  query.run({
-    $id: job.id,
-    $url: job.url,
-    $filename: job.filename,
-    $destination: job.destination,
-    $total_bytes: job.totalBytes,
-    $downloaded_bytes: job.downloadedBytes,
-    $chunks: JSON.stringify(job.chunks),
-    $status: job.status,
-    $speed: job.speed,
-    $eta: job.eta,
-    $created_at: job.createdAt,
-    $updated_at: job.updatedAt,
-    $error: job.error || null,
-  });
+export async function createJob(job: DownloadJob): Promise<void> {
+  await queryRun(
+    `INSERT INTO jobs (id, url, filename, destination, total_bytes, downloaded_bytes, chunks, status, speed, eta, created_at, updated_at, error)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      job.id,
+      job.url,
+      job.filename,
+      job.destination,
+      job.totalBytes,
+      job.downloadedBytes,
+      JSON.stringify(job.chunks),
+      job.status,
+      job.speed,
+      job.eta,
+      job.createdAt,
+      job.updatedAt,
+      job.error || null,
+    ]
+  );
 }
 
-export function updateJob(job: DownloadJob): void {
-  const query = db.prepare(`
-    UPDATE jobs
-    SET url = $url,
-        filename = $filename,
-        destination = $destination,
-        total_bytes = $total_bytes,
-        downloaded_bytes = $downloaded_bytes,
-        chunks = $chunks,
-        status = $status,
-        speed = $speed,
-        eta = $eta,
-        updated_at = $updated_at,
-        error = $error
-    WHERE id = $id
-  `);
-
-  query.run({
-    $id: job.id,
-    $url: job.url,
-    $filename: job.filename,
-    $destination: job.destination,
-    $total_bytes: job.totalBytes,
-    $downloaded_bytes: job.downloadedBytes,
-    $chunks: JSON.stringify(job.chunks),
-    $status: job.status,
-    $speed: job.speed,
-    $eta: job.eta,
-    $updated_at: Date.now(),
-    $error: job.error || null,
-  });
+export async function updateJob(job: DownloadJob): Promise<void> {
+  await queryRun(
+    `UPDATE jobs
+     SET url = ?, filename = ?, destination = ?, total_bytes = ?, downloaded_bytes = ?,
+         chunks = ?, status = ?, speed = ?, eta = ?, updated_at = ?, error = ?
+     WHERE id = ?`,
+    [
+      job.url,
+      job.filename,
+      job.destination,
+      job.totalBytes,
+      job.downloadedBytes,
+      JSON.stringify(job.chunks),
+      job.status,
+      job.speed,
+      job.eta,
+      Date.now(),
+      job.error || null,
+      job.id,
+    ]
+  );
 }
 
-export function getJob(id: string): DownloadJob | null {
-  const query = db.prepare('SELECT * FROM jobs WHERE id = ?');
-  const row = query.get(id) as JobRow | null;
+export async function getJob(id: string): Promise<DownloadJob | null> {
+  const row = await queryGet<JobRow>('SELECT * FROM jobs WHERE id = ?', [id]);
   return row ? mapRowToJob(row) : null;
 }
 
-export function listJobs(): DownloadJob[] {
-  const query = db.prepare('SELECT * FROM jobs ORDER BY created_at DESC');
-  const rows = query.all() as JobRow[];
+export async function listJobs(): Promise<DownloadJob[]> {
+  const rows = await queryAll<JobRow>('SELECT * FROM jobs ORDER BY created_at DESC');
   return rows.map(mapRowToJob);
 }
 
-export function deleteJob(id: string): void {
-  const query = db.prepare('DELETE FROM jobs WHERE id = ?');
-  query.run(id);
+export async function deleteJob(id: string): Promise<void> {
+  await queryRun('DELETE FROM jobs WHERE id = ?', [id]);
 }
 
-export function clearCompletedJobs(): void {
-  const query = db.prepare("DELETE FROM jobs WHERE status = 'completed'");
-  query.run();
+export async function clearCompletedJobs(): Promise<void> {
+  await queryRun("DELETE FROM jobs WHERE status = 'completed'");
 }

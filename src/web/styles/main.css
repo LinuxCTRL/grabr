@@ -1,5 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
 
+@font-face {
+  font-family: 'Operator Mono';
+  src: url('/fonts/OperatorMonoLig-Book.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 :root {
   --bg:         #09090b;
   --surface:    #121215;
@@ -16,7 +23,7 @@
   --error-glow: rgba(239, 68, 68, 0.15);
   --radius:     12px;
   --radius-sm:  6px;
-  --font-mono:  'JetBrains Mono', monospace;
+  --font-mono:  'Operator Mono', 'JetBrains Mono', monospace;
   --font-sans:  'DM Sans', sans-serif;
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }

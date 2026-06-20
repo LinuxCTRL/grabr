@@ -14,7 +14,7 @@ const app = new Hono();
 
 // Initialize and start downloader
 const downloader = new Downloader();
-downloader.start();
+await downloader.start();
 
 // Keep track of active WebSocket connections
 const wsClients = new Set<any>();
@@ -61,8 +61,8 @@ app.get(
 );
 
 // REST API routes
-app.get('/api/jobs', (c) => {
-  const jobs = listJobs();
+app.get('/api/jobs', async (c) => {
+  const jobs = await listJobs();
   return c.json(jobs);
 });
 
@@ -80,45 +80,45 @@ app.post('/api/jobs', async (c) => {
   }
 });
 
-app.get('/api/jobs/:id', (c) => {
+app.get('/api/jobs/:id', async (c) => {
   const id = c.req.param('id');
-  const job = getJob(id);
+  const job = await getJob(id);
   if (!job) {
     return c.text('Job not found', 404);
   }
   return c.json(job);
 });
 
-app.post('/api/jobs/:id/pause', (c) => {
+app.post('/api/jobs/:id/pause', async (c) => {
   const id = c.req.param('id');
-  downloader.pauseJob(id);
+  await downloader.pauseJob(id);
   return c.json({ success: true });
 });
 
-app.post('/api/jobs/:id/resume', (c) => {
+app.post('/api/jobs/:id/resume', async (c) => {
   const id = c.req.param('id');
-  downloader.resumeJob(id);
+  await downloader.resumeJob(id);
   return c.json({ success: true });
 });
 
-app.delete('/api/jobs/:id', (c) => {
+app.delete('/api/jobs/:id', async (c) => {
   const id = c.req.param('id');
-  downloader.removeJob(id);
+  await downloader.removeJob(id);
   return c.json({ success: true });
 });
 
-app.post('/api/jobs/pause-all', (c) => {
-  downloader.pauseAll();
+app.post('/api/jobs/pause-all', async (c) => {
+  await downloader.pauseAll();
   return c.json({ success: true });
 });
 
-app.post('/api/jobs/resume-all', (c) => {
-  downloader.resumeAll();
+app.post('/api/jobs/resume-all', async (c) => {
+  await downloader.resumeAll();
   return c.json({ success: true });
 });
 
-app.post('/api/jobs/clear-completed', (c) => {
-  clearCompletedJobs();
+app.post('/api/jobs/clear-completed', async (c) => {
+  await clearCompletedJobs();
   // Broadcast an update so UIs reload their lists
   broadcast({ type: 'jobs:cleared' });
   return c.json({ success: true });

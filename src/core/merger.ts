@@ -37,7 +37,7 @@ export async function mergeChunks(
 
   // End the destination write stream and wait for it to finish
   await new Promise<void>((resolve, reject) => {
-    finalWriteStream.end((err) => {
+    finalWriteStream.end((err: Error | null) => {
       if (err) reject(err);
       else resolve();
     });

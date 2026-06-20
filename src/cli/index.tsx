@@ -69,7 +69,7 @@ async function main() {
     } else {
       console.log('Daemon is not running. Starting dashboard in standalone mode...');
       const downloader = new Downloader();
-      downloader.start();
+      await downloader.start();
 
       const { waitUntilExit } = render(
         <Dashboard mode="local" downloader={downloader} />

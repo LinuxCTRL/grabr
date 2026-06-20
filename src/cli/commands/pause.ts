@@ -43,27 +43,27 @@ export async function pauseCommand(id: string) {
   } else {
     // Offline Database fallback
     if (id === 'all') {
-      const jobs = listJobs();
+      const jobs = await listJobs();
       let count = 0;
       for (const job of jobs) {
         if (job.status === 'downloading' || job.status === 'queued') {
           job.status = 'paused';
           job.speed = 0;
           job.eta = -1;
-          updateJob(job);
+          await updateJob(job);
           saveResumeState(job);
           count++;
         }
       }
       console.log(`Paused ${count} jobs in database.`);
     } else {
-      const job = getJob(id);
+      const job = await getJob(id);
       if (job) {
         if (job.status === 'downloading' || job.status === 'queued') {
           job.status = 'paused';
           job.speed = 0;
           job.eta = -1;
-          updateJob(job);
+          await updateJob(job);
           saveResumeState(job);
           console.log(`Paused job ${id} in database.`);
         } else {
