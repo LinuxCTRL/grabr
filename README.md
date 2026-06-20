@@ -3,7 +3,7 @@
 > A modern, elegant file downloader — CLI tool & Node.js/Bun library.
 
 ![CLI Dashboard](https://img.shields.io/badge/Bun-Node.js-blue)
-[![npm version](https://img.shields.io/npm/v/grabr)](https://www.npmjs.com/package/grabr)
+[![npm version](https://img.shields.io/npm/v/@linuxctrl/grabr)](https://www.npmjs.com/package/@linuxctrl/grabr)
 [![docs](https://img.shields.io/badge/docs-grabr--liard.vercel.app-amber)](https://grabr-liard.vercel.app)
 
 grabr is a local-first download manager with chunked parallel downloading, progress tracking, resumable transfers, and a clean terminal dashboard — all from your machine. No cloud, no accounts.
@@ -15,8 +15,8 @@ grabr is a local-first download manager with chunked parallel downloading, progr
 ## Install
 
 ```bash
-npm install -g grabr          # CLI globally
-npm install grabr              # or as a library
+npm install -g @linuxctrl/grabr          # CLI globally
+npm install @linuxctrl/grabr             # or as a library
 ```
 
 ---
@@ -50,8 +50,8 @@ Run `grabr` without arguments to open the interactive full-screen dashboard.
 ## Library API
 
 ```typescript
-import { Downloader, SpeedMeter, loadConfig, saveConfig } from 'grabr'
-import type { DownloadJob, DownloadOptions, JobStatus, ChunkInfo, GrabrConfig } from 'grabr'
+import { Downloader, SpeedMeter, loadConfig, saveConfig } from '@linuxctrl/grabr'
+import type { DownloadJob, DownloadOptions, JobStatus, ChunkInfo, GrabrConfig } from '@linuxctrl/grabr'
 
 const downloader = new Downloader()
 await downloader.start()
