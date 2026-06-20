@@ -4,6 +4,7 @@
 
 ![CLI Dashboard](https://img.shields.io/badge/Bun-Node.js-blue)
 [![npm version](https://img.shields.io/npm/v/grabr)](https://www.npmjs.com/package/grabr)
+[![docs](https://img.shields.io/badge/docs-grabr--liard.vercel.app-amber)](https://grabr-liard.vercel.app)
 
 grabr is a local-first download manager with chunked parallel downloading, progress tracking, resumable transfers, and a clean terminal dashboard — all from your machine. No cloud, no accounts.
 

@@ -1,0 +1,13 @@
+#!/bin/sh
+# Bumps patch version on every commit (e.g. 1.0.0 -> 1.0.1)
+
+node -e "
+const fs = require('fs');
+const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+const v = pkg.version.split('.').map(Number);
+v[2]++;
+pkg.version = v.join('.');
+fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');
+"
+
+git add package.json
