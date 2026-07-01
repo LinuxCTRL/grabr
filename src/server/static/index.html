@@ -24,7 +24,13 @@
           <span class="stat-label">Total Speed</span>
           <span id="total-speed" class="stat-value">0 B/s</span>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <button id="btn-theme-toggle" class="btn btn-secondary" style="padding: 0.75rem;" title="Toggle Light/Dark Theme">
+            <span id="theme-toggle-icon">☀️</span>
+          </button>
+          <button id="btn-get-extension" class="btn btn-secondary" title="Install Chrome Extension">
+            🔌 Browser Extension
+          </button>
           <button id="btn-clear-completed" class="btn btn-secondary" title="Clear completed jobs">
             Clear Completed
           </button>
@@ -39,37 +45,86 @@
       </div>
     </header>
 
-    <!-- Main Jobs Grid -->
-    <main>
-      <div id="jobs-grid" class="jobs-grid">
-        <!-- Job cards dynamically added here -->
-        <div class="empty-state">
-          <div class="empty-state-icon">↓</div>
-          <p>No downloads yet.</p>
-          <button id="btn-empty-add" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Add one now</button>
+    <!-- Main Layout Wrapper (Sidebar + Main panel) -->
+    <div class="app-layout">
+      <!-- Main Content Area -->
+      <main>
+        <div id="jobs-grid" class="jobs-grid">
+          <!-- Job cards dynamically added here -->
+          <div class="empty-state">
+            <div class="empty-state-icon">↓</div>
+            <p>No downloads yet.</p>
+            <button id="btn-empty-add" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Add one now</button>
+          </div>
         </div>
-      </div>
 
-      <!-- Job Detail & Chunk Panel (shown when a card is selected) -->
-      <div id="detail-panel" class="detail-panel">
-        <div class="detail-header">
-          <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <h2 id="detail-title" style="font-size: 1.25rem; font-weight: 700;">ubuntu-24.04.iso</h2>
-            <p id="detail-subtitle" style="font-size: 0.8rem; color: var(--muted); font-family: var(--font-mono);"></p>
+        <!-- Job Detail & Chunk Panel (shown when a card is selected) -->
+        <div id="detail-panel" class="detail-panel">
+          <div class="detail-header">
+            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+              <h2 id="detail-title" style="font-size: 1.25rem; font-weight: 700;">ubuntu-24.04.iso</h2>
+              <p id="detail-subtitle" style="font-size: 0.8rem; color: var(--muted); font-family: var(--font-mono);"></p>
+            </div>
+            <button id="btn-close-detail" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
+              Close Details
+            </button>
           </div>
-          <button id="btn-close-detail" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
-            Close Details
-          </button>
-        </div>
-        
-        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-          <span class="stat-label">Chunk Downloads (Parallel Ranges)</span>
-          <div id="chunk-grid" class="chunk-grid">
-            <!-- Chunk progress cards dynamically added here -->
+          
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <span class="stat-label">Chunk Downloads (Parallel Ranges)</span>
+            <div id="chunk-grid" class="chunk-grid">
+              <!-- Chunk progress cards dynamically added here -->
+            </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+
+      <!-- Sidebar with User tips and links -->
+      <aside class="sidebar">
+        <!-- About Card -->
+        <div class="sidebar-card">
+          <h3>About Grabr</h3>
+          <p>A modern, local-first file downloader with parallel chunked fetching, speed tracking, and crash-resilient resuming.</p>
+          
+          <div class="sidebar-links">
+            <a href="https://github.com/LinuxCTRL/grabr" target="_blank" class="sidebar-link" title="View Source on GitHub">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+              </svg>
+              GitHub Repo
+            </a>
+            <a href="https://www.npmjs.com/package/@linuxctrl/grabr" target="_blank" class="sidebar-link" title="View NPM Package">
+              <span style="font-family: monospace; font-weight: 800; color: #cb3837; font-size: 11px; letter-spacing: -1px; margin-right: 2px;">NPM</span>
+              NPM Package
+            </a>
+          </div>
+        </div>
+
+        <!-- Tips & Guidelines -->
+        <div class="sidebar-card">
+          <h3>Guides & Tips</h3>
+          <ul class="tips-list">
+            <li>
+              <strong><span class="tip-icon">🔌</span> Chrome Extension</strong>
+              <span>Install the integration extension to capture browser clicks and route downloads automatically.</span>
+            </li>
+            <li>
+              <strong><span class="tip-icon">⚡</span> Parallel Chunks</strong>
+              <span>Files are split into concurrent connections for speed. Default is 4 chunks, custom up to 16 chunks.</span>
+            </li>
+            <li>
+              <strong><span class="tip-icon">💻</span> CLI Management</strong>
+              <span>Control downloads from the terminal:</span>
+              <pre>grabr add &lt;url&gt;</pre>
+            </li>
+            <li>
+              <strong><span class="tip-icon">💾</span> Crash Resilient</strong>
+              <span>If your session is interrupted, Grabr retains chunk state in <code>~/.grabr/</code>, allowing seamless resumes.</span>
+            </li>
+          </ul>
+        </div>
+      </aside>
+    </div>
 
     <!-- Add Download Modal Overlay -->
     <div id="add-modal-overlay" class="modal-overlay">
@@ -100,6 +155,31 @@
         <div class="modal-actions">
           <button id="btn-close-add" class="btn btn-secondary">Cancel</button>
           <button id="btn-submit-download" class="btn">Start Download</button>
+        </div>
+    <!-- Extension Modal Overlay -->
+    <div id="extension-modal-overlay" class="modal-overlay">
+      <div class="modal" style="max-width: 550px;">
+        <h3 class="modal-title">🔌 Chrome Extension Integration</h3>
+        
+        <div class="form-group" style="font-size: 0.85rem; line-height: 1.5; display: flex; flex-direction: column; gap: 12px; color: var(--text);">
+          <p>You can automatically capture browser downloads and right-click links to send them to this Grabr interface!</p>
+          
+          <div style="background-color: var(--surface-lift); border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px;">
+            <strong style="color: var(--accent);">Step 1: Load Developer Extensions</strong>
+            <span>Open Chrome and navigate to <code>chrome://extensions</code>, then turn on the <strong>Developer mode</strong> switch in the top-right corner.</span>
+          </div>
+
+          <div style="background-color: var(--surface-lift); border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px;">
+            <strong style="color: var(--accent);">Step 2: Load Unpacked</strong>
+            <span>Click the <strong>Load unpacked</strong> button in the top-left and select this folder from your machine:</span>
+            <pre style="background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; overflow-x: auto; user-select: all; width: 100%;">/home/soufiane/Projects/grabr/extension</pre>
+          </div>
+
+          <p style="font-size: 11px; color: var(--muted);">Once loaded, you can configure your downloads size filter, concurrent chunks, and directories by right-clicking the Grabr extension icon and selecting "Options".</p>
+        </div>
+
+        <div class="modal-actions" style="margin-top: 0.5rem;">
+          <button id="btn-close-extension" class="btn btn-secondary" style="width: 100%; justify-content: center;">Got It!</button>
         </div>
       </div>
     </div>

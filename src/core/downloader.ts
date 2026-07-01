@@ -143,8 +143,10 @@ export class Downloader extends EventEmitter {
       this.emit('job:progress', {
         jobId: job.id,
         downloadedBytes: job.downloadedBytes,
+        totalBytes: job.totalBytes,
         speed: job.speed,
         eta: job.eta,
+        chunks: job.chunks,
       });
     }
   }

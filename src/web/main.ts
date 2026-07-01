@@ -17,6 +17,10 @@ const btnCloseAdd = document.getElementById('btn-close-add');
 const btnSubmitDownload = document.getElementById('btn-submit-download');
 const btnClearCompleted = document.getElementById('btn-clear-completed');
 
+const extensionModalOverlay = document.getElementById('extension-modal-overlay');
+const btnGetExtension = document.getElementById('btn-get-extension');
+const btnCloseExtension = document.getElementById('btn-close-extension');
+
 const detailPanel = document.getElementById('detail-panel');
 const detailTitle = document.getElementById('detail-title');
 const detailSubtitle = document.getElementById('detail-subtitle');
@@ -81,6 +85,7 @@ function handleWebSocketMessage(data: any) {
             downloadedBytes: data.downloadedBytes,
             speed: data.speed,
             eta: data.eta,
+            chunks: data.chunks || job.chunks,
             updatedAt: Date.now(),
           }
         : job
@@ -147,14 +152,16 @@ function updateJobCardDOM(jobId: string) {
   const job = jobs.find((j) => j.id === jobId);
   if (!job || !jobsGrid) return;
 
-  const card = jobsGrid.querySelector(`[data-id="${jobId}"]`);
+  const card = jobsGrid.querySelector(`[data-id="${jobId}"]`) as HTMLElement;
   if (card) {
     const isSelected = selectedJobId === jobId;
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = getJobCardHtml(job, isSelected);
-    const newCard = tempDiv.firstElementChild;
+    const newCard = tempDiv.firstElementChild as HTMLElement;
     if (newCard) {
-      card.replaceWith(newCard);
+      // Update properties on the existing node to keep hover states and transitions active
+      card.className = newCard.className;
+      card.innerHTML = newCard.innerHTML;
     }
   }
 }
@@ -299,9 +306,23 @@ function hideAddModal() {
   }
 }
 
+function showExtensionModal() {
+  if (extensionModalOverlay) {
+    extensionModalOverlay.classList.add('visible');
+  }
+}
+
+function hideExtensionModal() {
+  if (extensionModalOverlay) {
+    extensionModalOverlay.classList.remove('visible');
+  }
+}
+
 // Wire Event Listeners
 if (btnOpenAdd) btnOpenAdd.addEventListener('click', showAddModal);
 if (btnCloseAdd) btnCloseAdd.addEventListener('click', hideAddModal);
+if (btnGetExtension) btnGetExtension.addEventListener('click', showExtensionModal);
+if (btnCloseExtension) btnCloseExtension.addEventListener('click', hideExtensionModal);
 if (btnCloseDetail) {
   btnCloseDetail.addEventListener('click', () => {
     selectedJobId = null;
@@ -397,5 +418,31 @@ if (btnSubmitDownload) {
   });
 }
 
+// Theme Toggle Logic
+const btnThemeToggle = document.getElementById('btn-theme-toggle');
+const themeToggleIcon = document.getElementById('theme-toggle-icon');
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('grabr-theme') || 'dark';
+  if (savedTheme === 'light') {
+    document.body.classList.add('light-theme');
+    if (themeToggleIcon) themeToggleIcon.textContent = '🌙';
+  } else {
+    document.body.classList.remove('light-theme');
+    if (themeToggleIcon) themeToggleIcon.textContent = '☀️';
+  }
+}
+
+if (btnThemeToggle) {
+  btnThemeToggle.addEventListener('click', () => {
+    const isLight = document.body.classList.toggle('light-theme');
+    localStorage.setItem('grabr-theme', isLight ? 'light' : 'dark');
+    if (themeToggleIcon) {
+      themeToggleIcon.textContent = isLight ? '🌙' : '☀️';
+    }
+  });
+}
+
 // Initialize Page
+initTheme();
 connectWebSocket();

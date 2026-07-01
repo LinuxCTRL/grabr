@@ -180,6 +180,9 @@ var btnEmptyAdd = document.getElementById("btn-empty-add");
 var btnCloseAdd = document.getElementById("btn-close-add");
 var btnSubmitDownload = document.getElementById("btn-submit-download");
 var btnClearCompleted = document.getElementById("btn-clear-completed");
+var extensionModalOverlay = document.getElementById("extension-modal-overlay");
+var btnGetExtension = document.getElementById("btn-get-extension");
+var btnCloseExtension = document.getElementById("btn-close-extension");
 var detailPanel = document.getElementById("detail-panel");
 var detailTitle = document.getElementById("detail-title");
 var detailSubtitle = document.getElementById("detail-subtitle");
@@ -228,6 +231,7 @@ function handleWebSocketMessage(data) {
       downloadedBytes: data.downloadedBytes,
       speed: data.speed,
       eta: data.eta,
+      chunks: data.chunks || job.chunks,
       updatedAt: Date.now()
     } : job);
     updateJobCardDOM(data.jobId);
@@ -288,7 +292,8 @@ function updateJobCardDOM(jobId) {
     tempDiv.innerHTML = getJobCardHtml(job, isSelected);
     const newCard = tempDiv.firstElementChild;
     if (newCard) {
-      card.replaceWith(newCard);
+      card.className = newCard.className;
+      card.innerHTML = newCard.innerHTML;
     }
   }
 }
@@ -404,10 +409,24 @@ function hideAddModal() {
     inputChunks.value = "4";
   }
 }
+function showExtensionModal() {
+  if (extensionModalOverlay) {
+    extensionModalOverlay.classList.add("visible");
+  }
+}
+function hideExtensionModal() {
+  if (extensionModalOverlay) {
+    extensionModalOverlay.classList.remove("visible");
+  }
+}
 if (btnOpenAdd)
   btnOpenAdd.addEventListener("click", showAddModal);
 if (btnCloseAdd)
   btnCloseAdd.addEventListener("click", hideAddModal);
+if (btnGetExtension)
+  btnGetExtension.addEventListener("click", showExtensionModal);
+if (btnCloseExtension)
+  btnCloseExtension.addEventListener("click", hideExtensionModal);
 if (btnCloseDetail) {
   btnCloseDetail.addEventListener("click", () => {
     selectedJobId = null;
@@ -490,4 +509,28 @@ if (btnSubmitDownload) {
     }
   });
 }
+var btnThemeToggle = document.getElementById("btn-theme-toggle");
+var themeToggleIcon = document.getElementById("theme-toggle-icon");
+function initTheme() {
+  const savedTheme = localStorage.getItem("grabr-theme") || "dark";
+  if (savedTheme === "light") {
+    document.body.classList.add("light-theme");
+    if (themeToggleIcon)
+      themeToggleIcon.textContent = "\uD83C\uDF19";
+  } else {
+    document.body.classList.remove("light-theme");
+    if (themeToggleIcon)
+      themeToggleIcon.textContent = "☀️";
+  }
+}
+if (btnThemeToggle) {
+  btnThemeToggle.addEventListener("click", () => {
+    const isLight = document.body.classList.toggle("light-theme");
+    localStorage.setItem("grabr-theme", isLight ? "light" : "dark");
+    if (themeToggleIcon) {
+      themeToggleIcon.textContent = isLight ? "\uD83C\uDF19" : "☀️";
+    }
+  });
+}
+initTheme();
 connectWebSocket();

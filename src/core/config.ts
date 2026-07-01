@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, platform } from 'node:os';
 
 export interface GrabrConfig {
   outputDir: string;
@@ -13,8 +13,65 @@ export interface GrabrConfig {
 const configDir = join(homedir(), '.grabr');
 const configPath = join(configDir, 'config.json');
 
+/**
+ * Resolves the default downloads directory in a cross-platform manner,
+ * respecting localized system folders for Windows, macOS, and Linux
+ * (including languages like Arabic, Portuguese, French, and Spanish).
+ */
+export function getDefaultDownloadsDir(): string {
+  const home = homedir();
+  const currentPlatform = platform();
+
+  // 1. Linux XDG User Directories Check
+  if (currentPlatform === 'linux') {
+    const xdgConfigPath = join(home, '.config', 'user-dirs.dirs');
+    if (existsSync(xdgConfigPath)) {
+      try {
+        const content = readFileSync(xdgConfigPath, 'utf-8');
+        const match = content.match(/^XDG_DOWNLOAD_DIR="([^"]+)"/m);
+        if (match && match[1]) {
+          let xdgPath = match[1];
+          // Replace $HOME or ${HOME} references with the actual home path
+          xdgPath = xdgPath.replace(/\$HOME|\$\{HOME\}/g, home);
+          if (existsSync(xdgPath)) {
+            return xdgPath;
+          }
+        }
+      } catch {
+        // Fall back to manual checks if reading XDG config fails
+      }
+    }
+  }
+
+  // 2. Standard "Downloads" path check (typical for Windows, macOS, and standard Linux)
+  const standardDownloads = join(home, 'Downloads');
+  if (existsSync(standardDownloads)) {
+    return standardDownloads;
+  }
+
+  // 3. Fallback check for common localized Downloads folder names on different OS locales
+  const localizedNames = [
+    'Downloads',
+    'Transferências', // Portuguese
+    'التنزيلات',       // Arabic
+    'Téléchargements', // French
+    'Descargas',       // Spanish
+    'Download'         // German / Alternative
+  ];
+
+  for (const name of localizedNames) {
+    const candidate = join(home, name);
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  // 4. Default fallback if no directory matches
+  return standardDownloads;
+}
+
 const defaultConfig: GrabrConfig = {
-  outputDir: join(process.cwd(), 'downloads'),
+  outputDir: getDefaultDownloadsDir(),
   maxConcurrent: 3,
   defaultChunks: 4,
   serverPort: 7474,
@@ -44,6 +101,19 @@ export function loadConfig(): GrabrConfig {
     const parsed = JSON.parse(raw);
     
     let outputDir = parsed.outputDir || defaultConfig.outputDir;
+    
+    // Migration: If the outputDir points to the old default project-relative downloads folder,
+    // automatically migrate it to the user's home Downloads folder.
+    if (outputDir.endsWith('grabr/downloads')) {
+      outputDir = getDefaultDownloadsDir();
+      try {
+        const updated = { ...parsed, outputDir };
+        writeFileSync(configPath, JSON.stringify(updated, null, 2), 'utf-8');
+      } catch {
+        // Ignore write error
+      }
+    }
+
     if (outputDir.startsWith('~/')) {
       outputDir = join(homedir(), outputDir.slice(2));
     }

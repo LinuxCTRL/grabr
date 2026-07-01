@@ -47,6 +47,27 @@ Run `grabr` without arguments to open the interactive full-screen dashboard.
 
 ---
 
+## Browser Integration (Chrome Extension)
+
+Grabr comes with a custom browser extension to capture downloads and route them directly to the Grabr daemon.
+
+### Features:
+* **Automatic Interception:** Captures browser clicks on files matching specific extensions (like `.zip`, `.tar.gz`, `.dmg`, `.iso`, `.exe`) or files exceeding custom size thresholds.
+* **Context Menus:** Right-click any hyperlink and select **"Send link to Grabr"** to prompt download.
+* **Batch Downloader:** Highlight text containing multiple URLs, right-click, and select **"Download links in selection with Grabr"** to queue them in parallel.
+* **Real-time Toolbar Popup:** Includes a live WebSocket progress dashboard, dynamic active badge count, and action controls (Pause/Resume/Delete) right from your toolbar.
+
+### Setup:
+1. Make sure your daemon is running in the background:
+   ```bash
+   grabr daemon start
+   ```
+2. Open Google Chrome and navigate to `chrome://extensions`.
+3. Toggle on **Developer mode** in the top-right corner.
+4. Click **Load unpacked** in the top-left and select the `/extension` directory inside this repository.
+
+---
+
 ## Library API
 
 ```typescript
