@@ -45,6 +45,13 @@
       </div>
     </header>
 
+    <!-- Update Notification Banner -->
+    <div id="update-banner" class="update-banner" style="display: none;">
+      <span class="update-banner-icon">✨</span>
+      <span class="update-banner-text">A new version of Grabr is available! <span id="update-versions" style="font-weight: bold;"></span>. Run <code>npm install -g @linuxctrl/grabr</code> to update.</span>
+      <button id="btn-close-update" class="btn-close-update">&times;</button>
+    </div>
+
     <!-- Main Layout Wrapper (Sidebar + Main panel) -->
     <div class="app-layout">
       <!-- Main Content Area -->
@@ -158,24 +165,41 @@
         </div>
     <!-- Extension Modal Overlay -->
     <div id="extension-modal-overlay" class="modal-overlay">
-      <div class="modal" style="max-width: 550px;">
-        <h3 class="modal-title">🔌 Chrome Extension Integration</h3>
+      <div class="modal" style="max-width: 580px;">
+        <h3 class="modal-title">🔌 Browser Extension Integration</h3>
         
-        <div class="form-group" style="font-size: 0.85rem; line-height: 1.5; display: flex; flex-direction: column; gap: 12px; color: var(--text);">
+        <div class="form-group" style="font-size: 0.85rem; line-height: 1.5; display: flex; flex-direction: column; gap: 12px; color: var(--text); overflow-y: auto; max-height: 70vh; padding-right: 4px;">
           <p>You can automatically capture browser downloads and right-click links to send them to this Grabr interface!</p>
           
           <div style="background-color: var(--surface-lift); border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px;">
-            <strong style="color: var(--accent);">Step 1: Load Developer Extensions</strong>
-            <span>Open Chrome and navigate to <code>chrome://extensions</code>, then turn on the <strong>Developer mode</strong> switch in the top-right corner.</span>
+            <strong style="color: var(--accent);">Step 1: Enable Developer Mode</strong>
+            <span style="font-size: 0.8rem;">
+              • <strong>Google Chrome:</strong> Open <code>chrome://extensions</code> and enable <strong>Developer mode</strong> (top-right).<br>
+              • <strong>Microsoft Edge:</strong> Open <code>edge://extensions</code> and enable <strong>Developer mode</strong> (bottom-left).<br>
+              • <strong>Mozilla Firefox:</strong> Open <code>about:debugging#/runtime/this-firefox</code>.
+            </span>
           </div>
 
           <div style="background-color: var(--surface-lift); border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px;">
-            <strong style="color: var(--accent);">Step 2: Load Unpacked</strong>
-            <span>Click the <strong>Load unpacked</strong> button in the top-left and select this folder from your machine:</span>
-            <pre style="background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; overflow-x: auto; user-select: all; width: 100%;">/home/soufiane/Projects/grabr/extension</pre>
+            <strong style="color: var(--accent);">Step 2: Load the Extension</strong>
+            <span style="font-size: 0.8rem; margin-bottom: 4px;">
+              • <strong>Chrome / Edge:</strong> Click <strong>Load unpacked</strong> and select the directory below.<br>
+              • <strong>Firefox:</strong> Click <strong>Load Temporary Add-on...</strong> and select the <code>manifest.json</code> inside the firefox folder.
+            </span>
+            
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <span style="font-size: 0.75rem; color: var(--muted); font-weight: bold;">Google Chrome Path:</span>
+              <pre style="background: var(--bg); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; overflow-x: auto; user-select: all; width: 100%;">/home/soufiane/Projects/grabr/extension/google</pre>
+              
+              <span style="font-size: 0.75rem; color: var(--muted); font-weight: bold;">Microsoft Edge Path:</span>
+              <pre style="background: var(--bg); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; overflow-x: auto; user-select: all; width: 100%;">/home/soufiane/Projects/grabr/extension/edge</pre>
+              
+              <span style="font-size: 0.75rem; color: var(--muted); font-weight: bold;">Mozilla Firefox Path:</span>
+              <pre style="background: var(--bg); border: 1px solid var(--border); padding: 6px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; overflow-x: auto; user-select: all; width: 100%;">/home/soufiane/Projects/grabr/extension/firefox</pre>
+            </div>
           </div>
 
-          <p style="font-size: 11px; color: var(--muted);">Once loaded, you can configure your downloads size filter, concurrent chunks, and directories by right-clicking the Grabr extension icon and selecting "Options".</p>
+          <p style="font-size: 11px; color: var(--muted);">Once loaded, you can configure your downloads size filter, concurrent chunks, and directories by right-clicking the Grabr extension icon and selecting "Options" (or "Preferences" in Firefox).</p>
         </div>
 
         <div class="modal-actions" style="margin-top: 0.5rem;">

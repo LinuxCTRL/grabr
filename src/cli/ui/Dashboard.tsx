@@ -4,6 +4,21 @@ import type { DownloadJob } from '../../core/types';
 import { JobRow } from './JobRow';
 import { listJobs } from '../../store/jobs';
 import type { Downloader } from '../../core/downloader';
+import packageJson from '../../../package.json';
+
+const currentVersion = packageJson.version;
+
+function isNewerVersion(current: string, latest: string): boolean {
+  const cParts = current.split('.').map(Number);
+  const lParts = latest.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const c = cParts[i] ?? 0;
+    const l = lParts[i] ?? 0;
+    if (l > c) return true;
+    if (l < c) return false;
+  }
+  return false;
+}
 
 interface DashboardProps {
   mode: 'local' | 'remote';
@@ -15,7 +30,32 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
   const [jobs, setJobs] = useState<DownloadJob[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string>('');
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const { exit } = useApp();
+
+  // Check for newer version on npm
+  useEffect(() => {
+    let active = true;
+    async function checkVersion() {
+      try {
+        const res = await fetch('https://registry.npmjs.org/@linuxctrl/grabr/latest', {
+          signal: AbortSignal.timeout(2000),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { version: string };
+          if (active && data && data.version) {
+            setLatestVersion(data.version);
+          }
+        }
+      } catch {
+        // Silently ignore network failures
+      }
+    }
+    checkVersion();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const apiBase = `http://localhost:${serverPort}/api`;
   const wsUrl = `ws://localhost:${serverPort}/ws`;
@@ -181,6 +221,57 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
       return;
     }
 
+    if (input === 'o') {
+      try {
+        const checkRunning = async (port: number) => {
+          try {
+            const res = await fetch(`http://localhost:${port}/api/jobs`, { signal: AbortSignal.timeout(300) });
+            return res.ok;
+          } catch {
+            return false;
+          }
+        };
+        const isRunning = await checkRunning(serverPort);
+        if (!isRunning) {
+          setStatusMessage('Starting daemon...');
+          const { spawn } = await import('node:child_process');
+          const serverPath = require('node:path').join(process.cwd(), 'src/server/index.ts');
+          const stateDir = require('node:path').join(process.cwd(), '.grabr');
+          const pidFile = require('node:path').join(stateDir, 'daemon.pid');
+          const logFile = require('node:path').join(stateDir, 'daemon.log');
+          const out = require('node:fs').openSync(logFile, 'a');
+          const err = require('node:fs').openSync(logFile, 'a');
+          const child = spawn('bun', ['run', serverPath], {
+            detached: true,
+            stdio: ['ignore', out, err],
+            cwd: process.cwd(),
+            env: { ...process.env },
+          });
+          const pid = child.pid;
+          if (pid) {
+            require('node:fs').writeFileSync(pidFile, pid.toString(), 'utf-8');
+          }
+          child.unref();
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        
+        const os = process.platform;
+        const url = `http://localhost:${serverPort}`;
+        const { spawn } = await import('node:child_process');
+        if (os === 'darwin') {
+          spawn('open', [url], { stdio: 'ignore', detached: true }).unref();
+        } else if (os === 'win32') {
+          spawn('cmd', ['/c', 'start', url], { stdio: 'ignore', detached: true }).unref();
+        } else {
+          spawn('xdg-open', [url], { stdio: 'ignore', detached: true }).unref();
+        }
+        setStatusMessage('Web UI opened in browser');
+      } catch (err: any) {
+        setStatusMessage(`Failed to open browser: ${err.message}`);
+      }
+      return;
+    }
+
     if (jobs.length === 0) return;
     const selectedJob = jobs[selectedIndex];
     if (!selectedJob) return;
@@ -228,11 +319,43 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
   return (
     <Box flexDirection="column" padding={1} minHeight={12}>
       {/* Title block */}
-      <Box borderStyle="single" borderColor="amber" paddingX={2} marginBottom={1}>
-        <Text color="yellow" bold>
-          grabr — Downloader Dashboard ({mode === 'local' ? 'Standalone' : 'Daemon'})
-        </Text>
+      <Box flexDirection="row" borderStyle="single" borderColor="cyan" paddingX={2} paddingY={1} marginBottom={1} justifyContent="space-between" alignItems="center">
+        <Box flexDirection="column">
+          <Text color="cyan" bold>
+            {"  ____  ____    _    ____  ____  \n" +
+             " / ___||  _ \\  / \\  | __ )|  _ \\ \n" +
+             "| |  _ | |_) |/ _ \\ |  _ \\| |_) |\n" +
+             "| |_| ||  _ < / ___ \\| |_) |  _ < \n" +
+             " \\____||_| \\_\\/_/   \\_\\____/|_| \\_\\"}
+          </Text>
+          <Text color="gray">
+            {"  Modern, elegant downloader built with Bun + TypeScript"}
+          </Text>
+        </Box>
+        <Box flexDirection="column" alignItems="flex-end">
+          <Text color="green" bold>
+            ● {mode === 'local' ? 'Standalone' : 'Daemon Mode'}
+          </Text>
+          <Text color="gray">
+            Port: {serverPort}
+          </Text>
+          <Text color="gray">
+            Version: v{currentVersion}
+          </Text>
+        </Box>
       </Box>
+
+      {/* Version check alert */}
+      {latestVersion && isNewerVersion(currentVersion, latestVersion) && (
+        <Box borderStyle="round" borderColor="green" paddingX={2} paddingY={1} marginBottom={1} flexDirection="column">
+          <Text color="green" bold>
+            ✨ New version available: v{latestVersion} (Current: v{currentVersion})
+          </Text>
+          <Text color="gray">
+            Run 'npm install -g @linuxctrl/grabr' to update to the latest version!
+          </Text>
+        </Box>
+      )}
 
       {/* Main Jobs Area */}
       <Box flexDirection="column" flexGrow={1}>
@@ -257,7 +380,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
       {/* Footer shortcut bar */}
       <Box borderStyle="double" borderColor="gray" paddingX={1} marginTop={1} flexDirection="row" justifyContent="space-between">
         <Text color="gray">
-          <Text color="cyan" bold>q</Text> quit  |  <Text color="cyan" bold>p</Text> pause  |  <Text color="cyan" bold>r</Text> resume  |  <Text color="cyan" bold>x</Text> delete  |  <Text color="cyan" bold>↑↓</Text> navigate
+          <Text color="cyan" bold>q</Text> quit  |  <Text color="cyan" bold>o</Text> open in browser  |  <Text color="cyan" bold>p</Text> pause  |  <Text color="cyan" bold>r</Text> resume  |  <Text color="cyan" bold>x</Text> delete  |  <Text color="cyan" bold>↑↓</Text> navigate
         </Text>
         <Text color="gray">
           Total: {jobs.length} jobs

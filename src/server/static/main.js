@@ -532,5 +532,47 @@ if (btnThemeToggle) {
     }
   });
 }
+async function checkUpdates() {
+  const banner = document.getElementById("update-banner");
+  const versionsSpan = document.getElementById("update-versions");
+  const closeBtn = document.getElementById("btn-close-update");
+  if (!banner || !versionsSpan)
+    return;
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => {
+      banner.style.display = "none";
+    });
+  }
+  try {
+    const currentRes = await fetch("/api/version");
+    if (!currentRes.ok)
+      return;
+    const currentData = await currentRes.json();
+    const currentVer = currentData.version;
+    const latestRes = await fetch("https://registry.npmjs.org/@linuxctrl/grabr/latest");
+    if (!latestRes.ok)
+      return;
+    const latestData = await latestRes.json();
+    const latestVer = latestData.version;
+    const isNewer = (curr, lat) => {
+      const c = curr.split(".").map(Number);
+      const l = lat.split(".").map(Number);
+      for (let i = 0;i < 3; i++) {
+        const cVal = c[i] ?? 0;
+        const lVal = l[i] ?? 0;
+        if (lVal > cVal)
+          return true;
+        if (lVal < cVal)
+          return false;
+      }
+      return false;
+    };
+    if (isNewer(currentVer, latestVer)) {
+      versionsSpan.textContent = `v${latestVer} (installed: v${currentVer})`;
+      banner.style.display = "flex";
+    }
+  } catch (err) {}
+}
 initTheme();
 connectWebSocket();
+checkUpdates();

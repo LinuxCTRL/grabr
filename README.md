@@ -8,6 +8,12 @@
 
 grabr is a local-first download manager with chunked parallel downloading, progress tracking, resumable transfers, and a clean terminal dashboard — all from your machine. No cloud, no accounts.
 
+### Key Features:
+* **Automatic Daemon Startup:** Running the `grabr` CLI automatically spins up the background download daemon if it's not active, starting it up seamlessly.
+* **Open in Browser Shortcut:** Press `o` inside the CLI dashboard to immediately open the Web UI in your default browser.
+* **Browser Integration:** Route browser downloads directly to the Grabr daemon using custom extension plugins for Chrome, Edge, and Firefox.
+* **Version Checking:** Automatically alerts you in both the CLI dashboard and Web UI when a newer release of Grabr is available on NPM.
+
 **Works with:** Node.js ≥18, Bun ≥1.0
 
 ---
@@ -47,9 +53,9 @@ Run `grabr` without arguments to open the interactive full-screen dashboard.
 
 ---
 
-## Browser Integration (Chrome Extension)
+## Browser Integration (Chrome, Edge & Firefox Extensions)
 
-Grabr comes with a custom browser extension to capture downloads and route them directly to the Grabr daemon.
+Grabr comes with custom browser extensions to capture downloads and route them directly to the Grabr daemon.
 
 ### Features:
 * **Automatic Interception:** Captures browser clicks on files matching specific extensions (like `.zip`, `.tar.gz`, `.dmg`, `.iso`, `.exe`) or files exceeding custom size thresholds.
@@ -58,13 +64,21 @@ Grabr comes with a custom browser extension to capture downloads and route them 
 * **Real-time Toolbar Popup:** Includes a live WebSocket progress dashboard, dynamic active badge count, and action controls (Pause/Resume/Delete) right from your toolbar.
 
 ### Setup:
-1. Make sure your daemon is running in the background:
-   ```bash
-   grabr daemon start
-   ```
-2. Open Google Chrome and navigate to `chrome://extensions`.
-3. Toggle on **Developer mode** in the top-right corner.
-4. Click **Load unpacked** in the top-left and select the `/extension` directory inside this repository.
+
+#### For Google Chrome:
+1. Open Google Chrome and navigate to `chrome://extensions`.
+2. Toggle on **Developer mode** in the top-right corner.
+3. Click **Load unpacked** in the top-left and select the `/extension/google` directory inside this repository.
+
+#### For Microsoft Edge:
+1. Open Microsoft Edge and navigate to `edge://extensions`.
+2. Toggle on **Developer mode** in the bottom-left corner.
+3. Click **Load unpacked** and select the `/extension/edge` directory inside this repository.
+
+#### For Mozilla Firefox:
+1. Open Mozilla Firefox and navigate to `about:debugging#/runtime/this-firefox`.
+2. Click **Load Temporary Add-on...** on the right side.
+3. Select the `manifest.json` file inside the `/extension/firefox` directory in this repository.
 
 ---
 
@@ -140,6 +154,10 @@ grabr/
 │   ├── index.cjs                #   CJS library
 │   ├── index.d.ts               #   TypeScript declarations
 │   └── cli.js                   #   CLI executable
+├── extension/                   # Browser extensions
+│   ├── google/                  #   Chrome extension folder
+│   ├── edge/                    #   Edge extension folder
+│   └── firefox/                 #   Firefox extension folder (GECKO compatible)
 ├── src/
 │   ├── index.ts                 # Public library entry point
 │   ├── core/                    # Download engine (UI-agnostic)

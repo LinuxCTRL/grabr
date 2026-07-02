@@ -59,7 +59,26 @@ async function main() {
     // Open the interactive dashboard
     const config = loadConfig();
     const port = config.serverPort;
-    const running = await isDaemonRunning(port);
+    let running = await isDaemonRunning(port);
+
+    if (!running) {
+      console.log('Daemon is not running. Starting Grabr daemon...');
+      try {
+        const { daemonCommand } = await import('./commands/daemon');
+        await daemonCommand(['start']);
+        
+        // Wait for daemon to become responsive (up to 10 attempts, 2 seconds)
+        let attempts = 0;
+        while (attempts < 10) {
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          running = await isDaemonRunning(port);
+          if (running) break;
+          attempts++;
+        }
+      } catch (err: any) {
+        console.error('Failed to auto-start daemon:', err.message);
+      }
+    }
 
     if (running) {
       const { waitUntilExit } = render(
@@ -67,7 +86,7 @@ async function main() {
       );
       await waitUntilExit();
     } else {
-      console.log('Daemon is not running. Starting dashboard in standalone mode...');
+      console.log('Could not connect to daemon. Starting dashboard in standalone mode...');
       const downloader = new Downloader();
       await downloader.start();
 

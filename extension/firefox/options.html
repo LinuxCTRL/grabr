@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grabr Extension Settings</title>
+  <style>
+    :root {
+      --bg-main: #0f172a;
+      --bg-card: #1e293b;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #f59e0b;
+      --success: #22c55e;
+      --font-stack: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-stack);
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .logo-container {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #fbbf24, #d97706);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-arrow {
+      width: 18px;
+      height: 18px;
+      border-left: 4px solid white;
+      border-bottom: 4px solid white;
+      transform: rotate(-45deg) translate(2px, -2px);
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+    }
+
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    label {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .description {
+      font-size: 13px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      margin-top: -4px;
+    }
+
+    input[type="text"], input[type="number"], textarea {
+      width: 100%;
+      background-color: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: var(--text-main);
+      font-family: var(--font-stack);
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      user-select: none;
+      padding: 6px 0;
+    }
+
+    .checkbox-group input {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+
+    .save-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
+
+    .btn {
+      font-family: var(--font-stack);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+      box-shadow: 0 4px 10px rgba(245, 158, 11, 0.25);
+    }
+
+    .btn-primary:hover {
+      background-color: #d97706;
+      box-shadow: 0 6px 14px rgba(245, 158, 11, 0.35);
+    }
+
+    #status-msg {
+      font-size: 14px;
+      color: var(--success);
+      font-weight: 600;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    #status-msg.show {
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo-container">
+        <div class="logo-arrow"></div>
+      </div>
+      <h1>Grabr Extension Settings</h1>
+    </header>
+
+    <div class="card">
+      <div class="form-group">
+        <label class="checkbox-group">
+          <input type="checkbox" id="enabled">
+          <span>Enable Download Interception</span>
+        </label>
+        <span class="description">Automatically capture browser downloads and route them through Grabr.</span>
+      </div>
+
+      <div class="form-group">
+        <label for="server-url">Grabr Daemon URL</label>
+        <input type="text" id="server-url" placeholder="http://localhost:7474">
+        <span class="description">The URL and port where your local Grabr background server is running.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-group">
+          <input type="checkbox" id="intercept-all">
+          <span>Intercept All Downloads</span>
+        </label>
+        <span class="description">Intercept every download regardless of file extension.</span>
+      </div>
+
+      <div id="file-types-group" class="form-group">
+        <label for="file-types">Intercept File Extensions</label>
+        <textarea id="file-types" placeholder="zip, rar, tar, gz, 7z, dmg, pkg, iso, exe, msi"></textarea>
+        <span class="description">Comma-separated list of file extensions to intercept when "Intercept All" is unchecked.</span>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="default-chunks">Default Parallel Chunks</label>
+          <input type="number" id="default-chunks" min="1" max="32" value="4">
+        </div>
+        <div class="form-group">
+          <label for="min-size-mb">Min Size to Intercept (MB)</label>
+          <input type="number" id="min-size-mb" min="0" value="0">
+          <span class="description">0 to intercept files of any size.</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="default-output-dir">Default Save Directory</label>
+        <input type="text" id="default-output-dir" placeholder="e.g. ~/Downloads/Grabr">
+        <span class="description">Leave empty to use the server's default downloads directory.</span>
+      </div>
+
+      <div class="save-bar">
+        <span id="status-msg">Settings saved successfully!</span>
+        <button class="btn btn-primary" id="btn-save">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

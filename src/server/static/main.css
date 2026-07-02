@@ -552,6 +552,12 @@ body.light-theme {
   --error-glow:   rgba(220, 38, 38, 0.12);
 }
 
+body.light-theme h1 {
+  background: linear-gradient(135deg, #18181b 30%, #4b5563 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
 /* App Layout Grid (Sidebar + Main) */
 .app-layout {
   display: grid;
@@ -695,4 +701,54 @@ body.light-theme {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Update Banner */
+.update-banner {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: var(--radius);
+  padding: 1rem 1.5rem;
+  margin-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: var(--transition);
+  box-shadow: 0 4px 20px rgba(16, 185, 129, 0.05);
+  animation: slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.update-banner-icon {
+  font-size: 1.25rem;
+}
+
+.update-banner-text {
+  flex-grow: 1;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.update-banner-text code {
+  background-color: var(--bg);
+  border: 1px solid var(--border);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--success);
+}
+
+.btn-close-update {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  transition: var(--transition);
+}
+
+.btn-close-update:hover {
+  color: var(--text);
 }

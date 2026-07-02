@@ -61,6 +61,15 @@ app.get(
 );
 
 // REST API routes
+app.get('/api/version', async (c) => {
+  try {
+    const packageJson = await import('../../package.json');
+    return c.json({ version: packageJson.version });
+  } catch {
+    return c.json({ version: '1.0.9' });
+  }
+});
+
 app.get('/api/jobs', async (c) => {
   const jobs = await listJobs();
   return c.json(jobs);
