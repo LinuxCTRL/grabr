@@ -100,6 +100,14 @@ body {
   display: none;
 }
 
+.brand-logo {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  object-fit: cover;
+  box-shadow: 0 0 10px rgba(217, 119, 6, 0.25);
+}
+
 .btn {
   background-color: var(--accent);
   color: var(--bg);

@@ -1,5 +1,9 @@
 # grabr
 
+<p align="center">
+  <img src="./src/web/logo.png" alt="Grabr Logo" width="128" height="128" style="border-radius: 28px;" />
+</p>
+
 > A modern, elegant file downloader — CLI tool, Node.js/Bun library, and a **100% native Rust desktop app** (`grabr-desktop`).
 
 ![CLI Dashboard](https://img.shields.io/badge/Bun-Node.js-blue)
