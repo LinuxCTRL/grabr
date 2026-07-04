@@ -1,8 +1,9 @@
 import type { SqlJsStatic, Database as SqlJsDatabase } from 'sql.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
+import { homedir } from 'os';
 
-const stateDir = join(process.cwd(), '.grabr');
+const stateDir = join(homedir(), '.grabr');
 mkdirSync(stateDir, { recursive: true });
 
 const dbPath = join(stateDir, 'grabr.db');

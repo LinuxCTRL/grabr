@@ -1,12 +1,13 @@
 import type { DownloadJob, ChunkInfo } from '../core/types';
-import { getJobCardHtml } from './components/JobCard';
+import { getJobCardHtml, getFileIcon } from './components/JobCard';
 import { updateTopbar } from './components/Topbar';
-import { formatBytes } from './utils';
+import { formatBytes, formatSpeed, formatETA } from './utils';
 
 // Application State
 let jobs: DownloadJob[] = [];
 let selectedJobId: string | null = null;
 let ws: WebSocket | null = null;
+let activeFilter = 'all';
 
 // DOM Elements
 const jobsGrid = document.getElementById('jobs-grid');
@@ -26,12 +27,23 @@ const detailTitle = document.getElementById('detail-title');
 const detailSubtitle = document.getElementById('detail-subtitle');
 const chunkGrid = document.getElementById('chunk-grid');
 const btnCloseDetail = document.getElementById('btn-close-detail');
+const detailStatusVal = document.getElementById('detail-status-val');
+const detailSpeedVal = document.getElementById('detail-speed-val');
+const detailProgressVal = document.getElementById('detail-progress-val');
+const detailEtaVal = document.getElementById('detail-eta-val');
+const detailChunksTitle = document.getElementById('detail-chunks-title');
+
+const detailFileName = document.getElementById('detail-file-name');
+const detailFilePath = document.getElementById('detail-file-path');
+const detailFileIcon = document.getElementById('detail-file-icon');
 
 // Form Inputs
 const inputUrl = document.getElementById('download-url') as HTMLInputElement;
 const inputChunks = document.getElementById('download-chunks') as HTMLInputElement;
 const inputName = document.getElementById('download-name') as HTMLInputElement;
 const inputOutput = document.getElementById('download-output') as HTMLInputElement;
+const ytQualityGroup = document.getElementById('yt-quality-group');
+const downloadQuality = document.getElementById('download-quality') as HTMLSelectElement;
 
 // Fetch job list via REST API
 async function fetchJobs() {
@@ -170,24 +182,34 @@ function updateJobCardDOM(jobId: string) {
 function renderJobsGrid() {
   if (!jobsGrid) return;
 
-  if (jobs.length === 0) {
+  let filteredJobs = jobs;
+  if (activeFilter === 'downloading') {
+    filteredJobs = jobs.filter(j => j.status === 'downloading');
+  } else if (activeFilter === 'completed') {
+    filteredJobs = jobs.filter(j => j.status === 'completed');
+  } else if (activeFilter === 'paused') {
+    filteredJobs = jobs.filter(j => j.status === 'paused');
+  }
+
+  if (filteredJobs.length === 0) {
     jobsGrid.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">↓</div>
-        <p>No downloads yet.</p>
-        <button id="btn-empty-add" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Add one now</button>
+        <p>No ${activeFilter !== 'all' ? activeFilter : ''} downloads yet.</p>
+        ${activeFilter === 'all' ? '<button id="btn-empty-add" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Add one now</button>' : ''}
       </div>
     `;
     
-    // Wire up the new button inside empty state
-    const emptyBtn = document.getElementById('btn-empty-add');
-    if (emptyBtn) {
-      emptyBtn.addEventListener('click', showAddModal);
+    if (activeFilter === 'all') {
+      const emptyBtn = document.getElementById('btn-empty-add');
+      if (emptyBtn) {
+        emptyBtn.addEventListener('click', showAddModal);
+      }
     }
     return;
   }
 
-  const html = jobs.map((job) => getJobCardHtml(job, selectedJobId === job.id)).join('');
+  const html = filteredJobs.map((job) => getJobCardHtml(job, selectedJobId === job.id)).join('');
   jobsGrid.innerHTML = html;
 }
 
@@ -201,7 +223,6 @@ function updateStats() {
   updateTopbar(activeCount, totalSpeed);
 }
 
-// Render chunk and folder info details panel
 function renderDetailPanel() {
   if (!detailPanel || !detailTitle || !detailSubtitle || !chunkGrid) return;
 
@@ -217,35 +238,59 @@ function renderDetailPanel() {
     return;
   }
 
-  detailTitle.textContent = job.filename;
-  detailSubtitle.textContent = `Save path: ${job.destination}`;
+  detailTitle.textContent = 'Download Details';
+  detailSubtitle.textContent = 'Job configuration';
+
+  if (detailFileName) {
+    detailFileName.textContent = job.filename;
+    detailFileName.setAttribute('title', job.filename);
+  }
+  if (detailFilePath) {
+    detailFilePath.textContent = job.destination;
+    detailFilePath.setAttribute('title', job.destination);
+  }
+  if (detailFileIcon) {
+    detailFileIcon.textContent = getFileIcon(job.filename);
+  }
+
+  // Populate detailed summary stats fields
+  if (detailStatusVal) {
+    detailStatusVal.textContent = job.status.toUpperCase();
+    detailStatusVal.style.color = job.status === 'downloading' ? 'var(--accent)' : 
+                                  job.status === 'completed' ? 'var(--success)' : 
+                                  job.status === 'failed' ? 'var(--error)' : 'var(--muted)';
+  }
+  if (detailSpeedVal) {
+    detailSpeedVal.textContent = job.status === 'downloading' ? formatSpeed(job.speed) : '--';
+  }
+  if (detailProgressVal) {
+    detailProgressVal.textContent = `${formatBytes(job.downloadedBytes)} of ${job.totalBytes > 0 ? formatBytes(job.totalBytes) : 'Unknown'}`;
+  }
+  if (detailEtaVal) {
+    detailEtaVal.textContent = job.status === 'downloading' ? formatETA(job.eta) : '--';
+  }
 
   let chunkHtml = '';
   if (job.chunks && job.chunks.length > 0) {
+    if (detailChunksTitle) {
+      detailChunksTitle.textContent = `Parallel Chunks (${job.chunks.length} Threads)`;
+    }
     chunkHtml = job.chunks
       .map((chunk) => {
         const chunkSize = chunk.end - chunk.start + 1;
         const percent = chunkSize > 0 ? (chunk.downloaded / chunkSize) * 100 : 0;
+        const tooltip = `Chunk #${chunk.index + 1}: ${Math.round(percent)}% (${formatBytes(chunk.downloaded)} / ${formatBytes(chunkSize)})`;
         
         return `
-          <div class="chunk-card ${chunk.status}" data-chunk-index="${chunk.index}">
-            <div class="chunk-header">
-              <span>Chunk #${chunk.index + 1}</span>
-              <span>${Math.round(percent)}%</span>
-            </div>
-            <div class="chunk-bar-container">
-              <div class="chunk-bar" style="width: ${percent}%;"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); font-family: var(--font-mono);">
-              <span>${formatBytes(chunk.downloaded)}</span>
-              <span>of ${formatBytes(chunkSize)}</span>
-            </div>
-          </div>
+          <div class="chunk-block ${chunk.status}" data-chunk-index="${chunk.index}" data-tooltip="${tooltip}"></div>
         `;
       })
       .join('');
   } else {
-    chunkHtml = `<div style="grid-column: 1/-1; color: var(--muted); text-align: center; font-size: 0.85rem;">Single chunk stream</div>`;
+    if (detailChunksTitle) {
+      detailChunksTitle.textContent = 'Parallel Chunks';
+    }
+    chunkHtml = `<div style="grid-column: 1/-1; color: var(--muted); text-align: center; font-size: 0.8rem;">Single chunk stream</div>`;
   }
 
   chunkGrid.innerHTML = chunkHtml;
@@ -303,6 +348,9 @@ function hideAddModal() {
     inputName.value = '';
     inputOutput.value = '';
     inputChunks.value = '4';
+    if (ytQualityGroup) {
+      ytQualityGroup.style.display = 'none';
+    }
   }
 }
 
@@ -377,13 +425,31 @@ if (jobsGrid) {
   });
 }
 
+// URL auto-detect for YouTube quality selector
+if (inputUrl && ytQualityGroup) {
+  inputUrl.addEventListener('input', () => {
+    const val = inputUrl.value.trim();
+    if (val.includes('youtube.com') || val.includes('youtu.be')) {
+      ytQualityGroup.style.display = 'block';
+    } else {
+      ytQualityGroup.style.display = 'none';
+    }
+  });
+}
+
 // Submit new download via modal
 if (btnSubmitDownload) {
   btnSubmitDownload.addEventListener('click', async () => {
-    const url = inputUrl.value.trim();
+    let url = inputUrl.value.trim();
     if (!url) {
       alert('Please enter a valid file URL.');
       return;
+    }
+
+    // Append format as hash configuration if it is a YouTube URL
+    if (ytQualityGroup && ytQualityGroup.style.display === 'block' && downloadQuality) {
+      const selectedFormat = downloadQuality.value;
+      url = `${url}#format=${encodeURIComponent(selectedFormat)}`;
     }
 
     const chunks = parseInt(inputChunks.value, 10) || 4;
@@ -486,6 +552,17 @@ async function checkUpdates() {
     // Ignore version check errors
   }
 }
+
+// Bind Navigation Filters
+document.querySelectorAll('.nav-item').forEach((item) => {
+  item.addEventListener('click', (e) => {
+    e.preventDefault();
+    document.querySelectorAll('.nav-item').forEach((nav) => nav.classList.remove('active'));
+    item.classList.add('active');
+    activeFilter = item.getAttribute('data-filter') || 'all';
+    renderJobsGrid();
+  });
+});
 
 // Initialize Page
 initTheme();

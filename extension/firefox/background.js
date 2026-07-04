@@ -137,9 +137,29 @@ function batchDownloadLinks(text) {
         });
         if (response.ok) {
           successCount++;
+        } else {
+          throw new Error(`HTTP status ${response.status}`);
         }
       } catch (err) {
-        console.error('Failed to post URL to daemon:', url, err);
+        console.warn('HTTP post failed, trying native messaging fallback:', err);
+        const success = await new Promise((resolve) => {
+          chrome.runtime.sendNativeMessage('org.grabr.desktop', {
+            url: url,
+            filename: filename || '',
+            chunks: settings.defaultChunks
+          }, (res) => {
+            if (chrome.runtime.lastError) {
+              console.error('Native messaging also failed:', chrome.runtime.lastError.message);
+              resolve(false);
+            } else {
+              console.log('Native messaging fallback succeeded:', res);
+              resolve(res && res.success);
+            }
+          });
+        });
+        if (success) {
+          successCount++;
+        }
       }
     }
 
@@ -243,7 +263,7 @@ chrome.downloads.onCreated.addListener((downloadItem) => {
   });
 });
 
-// Listen for messages from popup dialog
+// Listen for messages from popup dialog or content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'download_chrome') {
     ignoredDownloads.add(message.url);
@@ -251,6 +271,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: true });
   } else if (message.type === 'update_badge') {
     updateBadge();
+    sendResponse({ success: true });
+  } else if (message.type === 'open_grabr_popup') {
+    openGrabrPopup(message.url, message.filename || '', message.sizeBytes || 0);
     sendResponse({ success: true });
   }
 });

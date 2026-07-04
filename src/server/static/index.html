@@ -7,131 +7,174 @@
   <link rel="stylesheet" href="main.css">
 </head>
 <body>
-  <div class="container">
-    <!-- Header with logo and stats -->
-    <header>
-      <div class="logo-group">
+  <div class="container-app">
+    <!-- Left Sidebar -->
+    <aside class="app-sidebar">
+      <div class="sidebar-brand">
         <div class="logo-dot"></div>
         <h1>grabr</h1>
       </div>
       
-      <div class="topbar-stats">
-        <div class="stat-item">
-          <span class="stat-label">Active Downloads</span>
-          <span id="active-count" class="stat-value">0</span>
+      <button id="btn-open-add" class="btn btn-primary btn-block">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+        Add Download
+      </button>
+
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-filter="all">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path>
+            </svg>
+          </span>
+          <span class="nav-label">All Downloads</span>
+        </a>
+        <a href="#" class="nav-item" data-filter="downloading">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </span>
+          <span class="nav-label">Downloading</span>
+        </a>
+        <a href="#" class="nav-item" data-filter="completed">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </span>
+          <span class="nav-label">Completed</span>
+        </a>
+        <a href="#" class="nav-item" data-filter="paused">
+          <span class="nav-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="10" x2="10" y1="15" y2="9"></line>
+              <line x1="14" x2="14" y1="15" y2="9"></line>
+            </svg>
+          </span>
+          <span class="nav-label">Paused</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="storage-card">
+          <span class="storage-title">Disk Storage</span>
+          <div class="storage-bar-bg">
+            <div class="storage-bar" style="width: 100%;"></div>
+          </div>
+          <span class="storage-text">Target folder active</span>
         </div>
-        <div class="stat-item">
-          <span class="stat-label">Total Speed</span>
-          <span id="total-speed" class="stat-value">0 B/s</span>
-        </div>
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-          <button id="btn-theme-toggle" class="btn btn-secondary" style="padding: 0.75rem;" title="Toggle Light/Dark Theme">
+        
+        <div class="sidebar-actions">
+          <button id="btn-theme-toggle" class="btn btn-icon" title="Toggle Theme">
             <span id="theme-toggle-icon">☀️</span>
           </button>
-          <button id="btn-get-extension" class="btn btn-secondary" title="Install Chrome Extension">
-            🔌 Browser Extension
-          </button>
-          <button id="btn-clear-completed" class="btn btn-secondary" title="Clear completed jobs">
-            Clear Completed
-          </button>
-          <button id="btn-open-add" class="btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            Add Download
+          <button id="btn-get-extension" class="btn btn-secondary-compact" title="Install Extension">
+            🔌 Extensions
           </button>
         </div>
       </div>
-    </header>
+    </aside>
 
-    <!-- Update Notification Banner -->
-    <div id="update-banner" class="update-banner" style="display: none;">
-      <span class="update-banner-icon">✨</span>
-      <span class="update-banner-text">A new version of Grabr is available! <span id="update-versions" style="font-weight: bold;"></span>. Run <code>npm install -g @linuxctrl/grabr</code> to update.</span>
-      <button id="btn-close-update" class="btn-close-update">&times;</button>
-    </div>
-
-    <!-- Main Layout Wrapper (Sidebar + Main panel) -->
-    <div class="app-layout">
-      <!-- Main Content Area -->
-      <main>
-        <div id="jobs-grid" class="jobs-grid">
-          <!-- Job cards dynamically added here -->
-          <div class="empty-state">
-            <div class="empty-state-icon">↓</div>
-            <p>No downloads yet.</p>
-            <button id="btn-empty-add" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Add one now</button>
+    <!-- Main Workspace -->
+    <div class="app-workspace">
+      <!-- Thin Header Topbar -->
+      <header class="workspace-header">
+        <div class="header-stats">
+          <div class="header-stat">
+            <span class="stat-lbl">Active Jobs</span>
+            <span id="active-count" class="stat-val">0</span>
+          </div>
+          <div class="header-stat">
+            <span class="stat-lbl">Total Speed</span>
+            <span id="total-speed" class="stat-val">0 B/s</span>
           </div>
         </div>
+        <div class="header-actions">
+          <button id="btn-clear-completed" class="btn btn-secondary-compact">
+            Clear Completed
+          </button>
+        </div>
+      </header>
 
-        <!-- Job Detail & Chunk Panel (shown when a card is selected) -->
-        <div id="detail-panel" class="detail-panel">
-          <div class="detail-header">
-            <div style="display: flex; flex-direction: column; gap: 0.25rem;">
-              <h2 id="detail-title" style="font-size: 1.25rem; font-weight: 700;">ubuntu-24.04.iso</h2>
-              <p id="detail-subtitle" style="font-size: 0.8rem; color: var(--muted); font-family: var(--font-mono);"></p>
+      <!-- Main Layout: Jobs + Details Drawer -->
+      <div class="workspace-content">
+        <!-- Update Notification Banner -->
+        <div id="update-banner" class="update-banner" style="display: none;">
+          <span class="update-banner-icon">✨</span>
+          <span class="update-banner-text">A new version of Grabr is available! <span id="update-versions" style="font-weight: bold;"></span>. Run <code>npm install -g @linuxctrl/grabr</code> to update.</span>
+          <button id="btn-close-update" class="btn-close-update">&times;</button>
+        </div>
+
+        <div class="content-split">
+          <!-- Jobs list (horizontal compact layout) -->
+          <main class="jobs-container">
+            <div id="jobs-grid" class="jobs-list">
+              <div class="empty-state">
+                <div class="empty-state-icon">↓</div>
+                <p>No downloads yet.</p>
+                <button id="btn-empty-add" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Add one now</button>
+              </div>
             </div>
-            <button id="btn-close-detail" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">
-              Close Details
-            </button>
-          </div>
-          
-          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-            <span class="stat-label">Chunk Downloads (Parallel Ranges)</span>
-            <div id="chunk-grid" class="chunk-grid">
-              <!-- Chunk progress cards dynamically added here -->
+          </main>
+
+          <!-- Details Drawer -->
+          <aside id="detail-panel" class="detail-panel-drawer">
+            <div class="detail-header">
+              <div class="detail-title-group">
+                <h3 id="detail-title">Download Details</h3>
+                <p id="detail-subtitle">Job configuration</p>
+              </div>
+              <button id="btn-close-detail" class="btn-close-detail">&times;</button>
             </div>
-          </div>
-        </div>
-      </main>
+            
+            <div class="detail-body">
+              <!-- File Info Card -->
+              <div class="detail-file-card">
+                <div class="file-card-icon" id="detail-file-icon">📁</div>
+                <div class="file-card-info">
+                  <span class="file-card-name" id="detail-file-name" title="">File Name</span>
+                  <span class="file-card-path" id="detail-file-path" title="">Save Path</span>
+                </div>
+              </div>
 
-      <!-- Sidebar with User tips and links -->
-      <aside class="sidebar">
-        <!-- About Card -->
-        <div class="sidebar-card">
-          <h3>About Grabr</h3>
-          <p>A modern, local-first file downloader with parallel chunked fetching, speed tracking, and crash-resilient resuming.</p>
-          
-          <div class="sidebar-links">
-            <a href="https://github.com/LinuxCTRL/grabr" target="_blank" class="sidebar-link" title="View Source on GitHub">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
-              </svg>
-              GitHub Repo
-            </a>
-            <a href="https://www.npmjs.com/package/@linuxctrl/grabr" target="_blank" class="sidebar-link" title="View NPM Package">
-              <span style="font-family: monospace; font-weight: 800; color: #cb3837; font-size: 11px; letter-spacing: -1px; margin-right: 2px;">NPM</span>
-              NPM Package
-            </a>
-          </div>
-        </div>
+              <!-- Summary Info Grid -->
+              <div class="detail-info-grid">
+                <div class="detail-info-row">
+                  <span class="detail-info-label">Status:</span>
+                  <span id="detail-status-val" class="detail-info-value" style="color: var(--accent);">--</span>
+                </div>
+                <div class="detail-info-row">
+                  <span class="detail-info-label">Speed:</span>
+                  <span id="detail-speed-val" class="detail-info-value-mono">--</span>
+                </div>
+                <div class="detail-info-row">
+                  <span class="detail-info-label">Downloaded:</span>
+                  <span id="detail-progress-val" class="detail-info-value-mono">--</span>
+                </div>
+                <div class="detail-info-row">
+                  <span class="detail-info-label">Time Left:</span>
+                  <span id="detail-eta-val" class="detail-info-value-mono">--</span>
+                </div>
+              </div>
 
-        <!-- Tips & Guidelines -->
-        <div class="sidebar-card">
-          <h3>Guides & Tips</h3>
-          <ul class="tips-list">
-            <li>
-              <strong><span class="tip-icon">🔌</span> Chrome Extension</strong>
-              <span>Install the integration extension to capture browser clicks and route downloads automatically.</span>
-            </li>
-            <li>
-              <strong><span class="tip-icon">⚡</span> Parallel Chunks</strong>
-              <span>Files are split into concurrent connections for speed. Default is 4 chunks, custom up to 16 chunks.</span>
-            </li>
-            <li>
-              <strong><span class="tip-icon">💻</span> CLI Management</strong>
-              <span>Control downloads from the terminal:</span>
-              <pre>grabr add &lt;url&gt;</pre>
-            </li>
-            <li>
-              <strong><span class="tip-icon">💾</span> Crash Resilient</strong>
-              <span>If your session is interrupted, Grabr retains chunk state in <code>~/.grabr/</code>, allowing seamless resumes.</span>
-            </li>
-          </ul>
+              <div class="detail-section">
+                <span class="detail-section-title" id="detail-chunks-title">Parallel Chunks</span>
+                <div id="chunk-grid" class="chunk-grid-blocks">
+                  <!-- Chunks will be dynamically loaded here -->
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
-      </aside>
+      </div>
     </div>
+  </div>
 
     <!-- Add Download Modal Overlay -->
     <div id="add-modal-overlay" class="modal-overlay">
@@ -141,6 +184,17 @@
         <div class="form-group">
           <label class="form-label" for="download-url">File URL</label>
           <input type="url" id="download-url" class="form-input form-input-mono" placeholder="https://example.com/largefile.zip" required autocomplete="off">
+        </div>
+
+        <div class="form-group" id="yt-quality-group" style="display: none; margin-bottom: 1rem;">
+          <label class="form-label" for="download-quality">YouTube Quality</label>
+          <select id="download-quality" class="form-input">
+            <option value="bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best">Best Quality (1080p+)</option>
+            <option value="bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best">720p HD (MP4)</option>
+            <option value="bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best">480p SD (MP4)</option>
+            <option value="bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best">360p Low (MP4)</option>
+            <option value="bestaudio[ext=m4a]/bestaudio">Audio Only (M4A)</option>
+          </select>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">

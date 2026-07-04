@@ -420,6 +420,14 @@
         <input type="text" id="filename" placeholder="e.g. archive.zip">
       </div>
 
+      <!-- YouTube Format selection (hidden by default) -->
+      <div class="form-group" id="yt-format-group" style="display: none;">
+        <label for="yt-format">Choose Format</label>
+        <select id="yt-format" style="width: 100%; background-color: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; color: var(--text-main); font-family: var(--font-stack); font-size: 14px; outline: none; transition: border-color 0.2s ease;">
+          <option value="">Analyzing YouTube video formats...</option>
+        </select>
+      </div>
+
       <div class="input-row">
         <div class="form-group">
           <label for="output-dir">Save Directory</label>

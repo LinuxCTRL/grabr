@@ -1,4 +1,6 @@
 import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { spawn } from 'node:child_process';
 import { createBunWebSocket } from 'hono/bun';
 import { serveStatic } from 'hono/bun';
 import { Downloader } from '../core/downloader';
@@ -11,6 +13,8 @@ const port = config.serverPort;
 
 const { upgradeWebSocket, websocket } = createBunWebSocket();
 const app = new Hono();
+
+app.use('/api/*', cors());
 
 // Initialize and start downloader
 const downloader = new Downloader();
@@ -131,6 +135,32 @@ app.post('/api/jobs/clear-completed', async (c) => {
   // Broadcast an update so UIs reload their lists
   broadcast({ type: 'jobs:cleared' });
   return c.json({ success: true });
+});
+
+app.get('/api/youtube/formats', async (c) => {
+  const url = c.req.query('url');
+  if (!url) {
+    return c.text('URL query parameter is required', 400);
+  }
+  return new Promise<any>((resolve) => {
+    const child: any = spawn('yt-dlp', ['-j', '--no-playlist', url]);
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d: any) => stdout += d.toString());
+    child.stderr.on('data', (d: any) => stderr += d.toString());
+    child.on('close', (code: any) => {
+      if (code !== 0) {
+        resolve(c.text(`yt-dlp failed: ${stderr}`, 500));
+        return;
+      }
+      try {
+        const info = JSON.parse(stdout);
+        resolve(c.json(info));
+      } catch (err) {
+        resolve(c.text(`Failed to parse yt-dlp output: ${err}`, 500));
+      }
+    });
+  });
 });
 
 // Serve Web UI static files

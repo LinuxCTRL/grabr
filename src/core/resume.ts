@@ -1,8 +1,9 @@
 import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import type { DownloadJob } from './types';
 
-const stateDir = join(process.cwd(), '.grabr');
+const stateDir = join(homedir(), '.grabr');
 
 function ensureStateDir() {
   if (!existsSync(stateDir)) {

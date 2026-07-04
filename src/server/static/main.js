@@ -73,6 +73,24 @@ function formatETA(seconds) {
 }
 
 // src/web/components/JobCard.ts
+function getFileIcon(filename) {
+  const ext = filename.split(".").pop()?.toLowerCase();
+  if (!ext)
+    return "⬇️";
+  if (["zip", "rar", "tar", "gz", "7z", "dmg", "pkg", "iso"].includes(ext))
+    return "\uD83D\uDCE6";
+  if (["mp4", "mkv", "avi", "mov", "webm"].includes(ext))
+    return "\uD83C\uDFA5";
+  if (["mp3", "wav", "flac", "ogg", "m4a"].includes(ext))
+    return "\uD83C\uDFB5";
+  if (["exe", "msi", "sh", "bat"].includes(ext))
+    return "⚙️";
+  if (["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md"].includes(ext))
+    return "\uD83D\uDCC4";
+  if (["jpg", "jpeg", "png", "gif", "svg", "webp"].includes(ext))
+    return "\uD83D\uDDBC️";
+  return "⬇️";
+}
 function getJobCardHtml(job, isSelected) {
   const percent = job.totalBytes > 0 ? job.downloadedBytes / job.totalBytes * 100 : 0;
   const activeClass = isSelected ? "active" : "";
@@ -80,7 +98,7 @@ function getJobCardHtml(job, isSelected) {
   let etaText = "--";
   if (job.status === "downloading") {
     speedText = formatSpeed(job.speed);
-    etaText = `${formatETA(job.eta)} remaining`;
+    etaText = formatETA(job.eta);
   } else if (job.status === "completed") {
     speedText = "Completed";
     etaText = "Done";
@@ -92,66 +110,59 @@ function getJobCardHtml(job, isSelected) {
     etaText = "Waiting...";
   } else if (job.status === "failed") {
     speedText = "Failed";
-    etaText = "Error occurred";
+    etaText = "Error";
   }
   let actionButton = "";
   if (job.status === "downloading" || job.status === "queued") {
     actionButton = `
-      <button class="action-btn btn-pause" data-action="pause" data-id="${job.id}">
+      <button class="btn-action-icon action-btn" data-action="pause" data-id="${job.id}" title="Pause">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="6" y="4" width="4" height="16"></rect>
           <rect x="14" y="4" width="4" height="16"></rect>
         </svg>
-        Pause
       </button>
     `;
   } else if (job.status === "paused" || job.status === "failed") {
     actionButton = `
-      <button class="action-btn btn-resume" data-action="resume" data-id="${job.id}">
+      <button class="btn-action-icon action-btn" data-action="resume" data-id="${job.id}" title="Resume">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
         </svg>
-        Resume
       </button>
     `;
   }
+  const deleteButton = `
+    <button class="btn-action-icon btn-danger action-btn" data-action="remove" data-id="${job.id}" title="Delete">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+    </button>
+  `;
+  const icon = getFileIcon(job.filename);
+  const sizeText = `${formatBytes(job.downloadedBytes)} of ${job.totalBytes > 0 ? formatBytes(job.totalBytes) : "Unknown"}`;
   return `
     <div class="job-card ${activeClass}" data-id="${job.id}">
+      <span style="font-size: 1.5rem; flex-shrink: 0; user-select: none;">${icon}</span>
+      
       <div class="job-card-header">
-        <div style="display: flex; flex-direction: column; gap: 0.5rem; flex-grow: 1; max-width: calc(100% - 60px);">
-          <span class="job-title" title="${job.filename}">${job.filename}</span>
-          <span class="job-status-badge badge-${job.status}">${job.status}</span>
-        </div>
-        
-        <div class="progress-ring-container">
-          ${getProgressRingHtml(percent, job.status)}
-          <span class="progress-ring-text">${Math.round(percent)}%</span>
-        </div>
+        <span class="job-title" title="${job.filename}">${job.filename}</span>
+        <span class="job-meta-desc">${sizeText} | ${job.status.toUpperCase()}</span>
       </div>
 
-      <div class="job-stats">
-        <div class="job-speed-eta">
-          <span class="job-speed">${speedText}</span>
-          <span>${etaText}</span>
-        </div>
-        
-        <div class="job-size">
-          <span style="color: var(--text); font-weight: 600;">
-            ${formatBytes(job.downloadedBytes)}
-          </span>
-          <span>of ${job.totalBytes > 0 ? formatBytes(job.totalBytes) : "Unknown"}</span>
-        </div>
+      <div class="progress-ring-container">
+        ${getProgressRingHtml(percent, job.status)}
+        <span class="progress-ring-text">${Math.round(percent)}%</span>
       </div>
 
-      <div class="job-actions">
+      <div class="job-stats-compact">
+        <span class="job-speed-compact">${speedText}</span>
+        <span class="job-eta-compact">${etaText}</span>
+      </div>
+
+      <div class="job-actions-compact">
         ${actionButton}
-        <button class="action-btn btn-remove" data-action="remove" data-id="${job.id}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-          Delete
-        </button>
+        ${deleteButton}
       </div>
     </div>
   `;
@@ -173,6 +184,7 @@ function updateTopbar(activeCount, totalSpeed) {
 var jobs = [];
 var selectedJobId = null;
 var ws = null;
+var activeFilter = "all";
 var jobsGrid = document.getElementById("jobs-grid");
 var addModalOverlay = document.getElementById("add-modal-overlay");
 var btnOpenAdd = document.getElementById("btn-open-add");
@@ -188,10 +200,20 @@ var detailTitle = document.getElementById("detail-title");
 var detailSubtitle = document.getElementById("detail-subtitle");
 var chunkGrid = document.getElementById("chunk-grid");
 var btnCloseDetail = document.getElementById("btn-close-detail");
+var detailStatusVal = document.getElementById("detail-status-val");
+var detailSpeedVal = document.getElementById("detail-speed-val");
+var detailProgressVal = document.getElementById("detail-progress-val");
+var detailEtaVal = document.getElementById("detail-eta-val");
+var detailChunksTitle = document.getElementById("detail-chunks-title");
+var detailFileName = document.getElementById("detail-file-name");
+var detailFilePath = document.getElementById("detail-file-path");
+var detailFileIcon = document.getElementById("detail-file-icon");
 var inputUrl = document.getElementById("download-url");
 var inputChunks = document.getElementById("download-chunks");
 var inputName = document.getElementById("download-name");
 var inputOutput = document.getElementById("download-output");
+var ytQualityGroup = document.getElementById("yt-quality-group");
+var downloadQuality = document.getElementById("download-quality");
 async function fetchJobs() {
   try {
     const res = await fetch("/api/jobs");
@@ -300,21 +322,31 @@ function updateJobCardDOM(jobId) {
 function renderJobsGrid() {
   if (!jobsGrid)
     return;
-  if (jobs.length === 0) {
+  let filteredJobs = jobs;
+  if (activeFilter === "downloading") {
+    filteredJobs = jobs.filter((j) => j.status === "downloading");
+  } else if (activeFilter === "completed") {
+    filteredJobs = jobs.filter((j) => j.status === "completed");
+  } else if (activeFilter === "paused") {
+    filteredJobs = jobs.filter((j) => j.status === "paused");
+  }
+  if (filteredJobs.length === 0) {
     jobsGrid.innerHTML = `
       <div class="empty-state">
         <div class="empty-state-icon">↓</div>
-        <p>No downloads yet.</p>
-        <button id="btn-empty-add" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Add one now</button>
+        <p>No ${activeFilter !== "all" ? activeFilter : ""} downloads yet.</p>
+        ${activeFilter === "all" ? '<button id="btn-empty-add" class="btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Add one now</button>' : ""}
       </div>
     `;
-    const emptyBtn = document.getElementById("btn-empty-add");
-    if (emptyBtn) {
-      emptyBtn.addEventListener("click", showAddModal);
+    if (activeFilter === "all") {
+      const emptyBtn = document.getElementById("btn-empty-add");
+      if (emptyBtn) {
+        emptyBtn.addEventListener("click", showAddModal);
+      }
     }
     return;
   }
-  const html = jobs.map((job) => getJobCardHtml(job, selectedJobId === job.id)).join("");
+  const html = filteredJobs.map((job) => getJobCardHtml(job, selectedJobId === job.id)).join("");
   jobsGrid.innerHTML = html;
 }
 function updateStats() {
@@ -335,31 +367,50 @@ function renderDetailPanel() {
     selectedJobId = null;
     return;
   }
-  detailTitle.textContent = job.filename;
-  detailSubtitle.textContent = `Save path: ${job.destination}`;
+  detailTitle.textContent = "Download Details";
+  detailSubtitle.textContent = "Job configuration";
+  if (detailFileName) {
+    detailFileName.textContent = job.filename;
+    detailFileName.setAttribute("title", job.filename);
+  }
+  if (detailFilePath) {
+    detailFilePath.textContent = job.destination;
+    detailFilePath.setAttribute("title", job.destination);
+  }
+  if (detailFileIcon) {
+    detailFileIcon.textContent = getFileIcon(job.filename);
+  }
+  if (detailStatusVal) {
+    detailStatusVal.textContent = job.status.toUpperCase();
+    detailStatusVal.style.color = job.status === "downloading" ? "var(--accent)" : job.status === "completed" ? "var(--success)" : job.status === "failed" ? "var(--error)" : "var(--muted)";
+  }
+  if (detailSpeedVal) {
+    detailSpeedVal.textContent = job.status === "downloading" ? formatSpeed(job.speed) : "--";
+  }
+  if (detailProgressVal) {
+    detailProgressVal.textContent = `${formatBytes(job.downloadedBytes)} of ${job.totalBytes > 0 ? formatBytes(job.totalBytes) : "Unknown"}`;
+  }
+  if (detailEtaVal) {
+    detailEtaVal.textContent = job.status === "downloading" ? formatETA(job.eta) : "--";
+  }
   let chunkHtml = "";
   if (job.chunks && job.chunks.length > 0) {
+    if (detailChunksTitle) {
+      detailChunksTitle.textContent = `Parallel Chunks (${job.chunks.length} Threads)`;
+    }
     chunkHtml = job.chunks.map((chunk) => {
       const chunkSize = chunk.end - chunk.start + 1;
       const percent = chunkSize > 0 ? chunk.downloaded / chunkSize * 100 : 0;
+      const tooltip = `Chunk #${chunk.index + 1}: ${Math.round(percent)}% (${formatBytes(chunk.downloaded)} / ${formatBytes(chunkSize)})`;
       return `
-          <div class="chunk-card ${chunk.status}" data-chunk-index="${chunk.index}">
-            <div class="chunk-header">
-              <span>Chunk #${chunk.index + 1}</span>
-              <span>${Math.round(percent)}%</span>
-            </div>
-            <div class="chunk-bar-container">
-              <div class="chunk-bar" style="width: ${percent}%;"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--muted); font-family: var(--font-mono);">
-              <span>${formatBytes(chunk.downloaded)}</span>
-              <span>of ${formatBytes(chunkSize)}</span>
-            </div>
-          </div>
+          <div class="chunk-block ${chunk.status}" data-chunk-index="${chunk.index}" data-tooltip="${tooltip}"></div>
         `;
     }).join("");
   } else {
-    chunkHtml = `<div style="grid-column: 1/-1; color: var(--muted); text-align: center; font-size: 0.85rem;">Single chunk stream</div>`;
+    if (detailChunksTitle) {
+      detailChunksTitle.textContent = "Parallel Chunks";
+    }
+    chunkHtml = `<div style="grid-column: 1/-1; color: var(--muted); text-align: center; font-size: 0.8rem;">Single chunk stream</div>`;
   }
   chunkGrid.innerHTML = chunkHtml;
   detailPanel.classList.add("visible");
@@ -407,6 +458,9 @@ function hideAddModal() {
     inputName.value = "";
     inputOutput.value = "";
     inputChunks.value = "4";
+    if (ytQualityGroup) {
+      ytQualityGroup.style.display = "none";
+    }
   }
 }
 function showExtensionModal() {
@@ -473,12 +527,26 @@ if (jobsGrid) {
     }
   });
 }
+if (inputUrl && ytQualityGroup) {
+  inputUrl.addEventListener("input", () => {
+    const val = inputUrl.value.trim();
+    if (val.includes("youtube.com") || val.includes("youtu.be")) {
+      ytQualityGroup.style.display = "block";
+    } else {
+      ytQualityGroup.style.display = "none";
+    }
+  });
+}
 if (btnSubmitDownload) {
   btnSubmitDownload.addEventListener("click", async () => {
-    const url = inputUrl.value.trim();
+    let url = inputUrl.value.trim();
     if (!url) {
       alert("Please enter a valid file URL.");
       return;
+    }
+    if (ytQualityGroup && ytQualityGroup.style.display === "block" && downloadQuality) {
+      const selectedFormat = downloadQuality.value;
+      url = `${url}#format=${encodeURIComponent(selectedFormat)}`;
     }
     const chunks = parseInt(inputChunks.value, 10) || 4;
     const name = inputName.value.trim() || undefined;
@@ -573,6 +641,15 @@ async function checkUpdates() {
     }
   } catch (err) {}
 }
+document.querySelectorAll(".nav-item").forEach((item) => {
+  item.addEventListener("click", (e) => {
+    e.preventDefault();
+    document.querySelectorAll(".nav-item").forEach((nav) => nav.classList.remove("active"));
+    item.classList.add("active");
+    activeFilter = item.getAttribute("data-filter") || "all";
+    renderJobsGrid();
+  });
+});
 initTheme();
 connectWebSocket();
 checkUpdates();

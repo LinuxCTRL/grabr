@@ -5,6 +5,11 @@ import { JobRow } from './JobRow';
 import { listJobs } from '../../store/jobs';
 import type { Downloader } from '../../core/downloader';
 import packageJson from '../../../package.json';
+import { formatBytes, formatSpeed, formatETA } from './utils';
+import fs from 'node:fs';
+import path from 'node:path';
+import { homedir } from 'node:os';
+import { spawn } from 'node:child_process';
 
 const currentVersion = packageJson.version;
 
@@ -26,12 +31,45 @@ interface DashboardProps {
   serverPort?: number;      // used in remote mode
 }
 
+function FormInput({ label, value, isFocused, placeholder }: { label: string; value: string; isFocused: boolean; placeholder?: string }) {
+  return (
+    <Box flexDirection="row" marginBottom={0}>
+      <Text color={isFocused ? 'cyan' : 'gray'} bold={isFocused}>
+        {isFocused ? '▶ ' : '  '}
+        {label.padEnd(16)}:{' '}
+      </Text>
+      {isFocused ? (
+        <Box borderStyle="single" borderColor="cyan" paddingX={1}>
+          <Text color="white">{value || placeholder || ''}</Text>
+          <Text color="cyan" bold>█</Text>
+        </Box>
+      ) : (
+        <Text color={value ? 'white' : 'gray'}>{value || placeholder || '-'}</Text>
+      )}
+    </Box>
+  );
+}
+
 export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProps) {
   const [jobs, setJobs] = useState<DownloadJob[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const { exit } = useApp();
+
+  // Dialog & Add Job Form State
+  const [activeDialog, setActiveDialog] = useState<null | 'add-job' | 'delete-confirm'>(null);
+  const [focusedField, setFocusedField] = useState<number>(0);
+  const [inputUrl, setInputUrl] = useState('');
+  const [inputFilename, setInputFilename] = useState('');
+  const [inputOutDir, setInputOutDir] = useState('');
+  const [confirmJobId, setConfirmJobId] = useState<string | null>(null);
+
+  // YouTube formats state
+  const [ytFormats, setYtFormats] = useState<{ value: string; label: string; ext: string }[]>([]);
+  const [ytSelectedFormatIndex, setYtSelectedFormatIndex] = useState(0);
+  const [isAnalyzingYt, setIsAnalyzingYt] = useState(false);
+  const [ytAnalysisError, setYtAnalysisError] = useState<string | null>(null);
 
   // Check for newer version on npm
   useEffect(() => {
@@ -56,6 +94,128 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
       active = false;
     };
   }, []);
+
+  // Fetch YouTube formats using yt-dlp locally or remote daemon
+  async function fetchYtFormats(url: string) {
+    setIsAnalyzingYt(true);
+    setYtAnalysisError(null);
+    setYtFormats([]);
+    setYtSelectedFormatIndex(0);
+
+    try {
+      let info: any;
+      if (mode === 'local') {
+        info = await new Promise((resolve, reject) => {
+          const child: any = spawn('yt-dlp', ['-j', '--no-playlist', url]);
+          let stdout = '';
+          let stderr = '';
+          child.stdout.on('data', (d: any) => stdout += d.toString());
+          child.stderr.on('data', (d: any) => stderr += d.toString());
+          child.on('close', (code: any) => {
+            if (code !== 0) return reject(new Error(stderr.trim() || 'yt-dlp failed'));
+            try {
+              resolve(JSON.parse(stdout));
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
+      } else {
+        const res = await fetch(`${apiBase}/youtube/formats?url=${encodeURIComponent(url)}`);
+        if (!res.ok) {
+          throw new Error(await res.text() || 'Failed to fetch formats');
+        }
+        info = await res.json();
+      }
+
+      if (info && info.formats) {
+        if (info.title && !inputFilename) {
+          setInputFilename(info.title.replace(/[|\\/:*?"<>]/g, '_').trim());
+        }
+
+        const formats = info.formats || [];
+        const videoFormats = formats.filter((f: any) => f.vcodec && f.vcodec !== 'none');
+        
+        const processed = videoFormats.map((f: any) => {
+          const isCombined = f.acodec && f.acodec !== 'none';
+          const res = f.height ? `${f.height}p` : (f.resolution || 'unknown');
+          const fpsStr = f.fps && f.fps > 30 ? `${f.fps}fps` : '';
+          const size = f.filesize || f.filesize_approx || 0;
+          return {
+            value: isCombined ? f.format_id : `${f.format_id}+bestaudio[ext=m4a]/bestaudio`,
+            label: `${f.ext.toUpperCase()} ${res} ${fpsStr ? fpsStr + ' ' : ''}(${isCombined ? 'Direct' : 'Merged + Audio'})${size > 0 ? ` (~${formatBytes(size)})` : ''}`,
+            ext: isCombined ? f.ext : 'mp4'
+          };
+        });
+
+        processed.sort((a: any, b: any) => {
+          const aHeight = parseInt(a.label.match(/\d+p/)?.[0] || '0');
+          const bHeight = parseInt(b.label.match(/\d+p/)?.[0] || '0');
+          return bHeight - aHeight;
+        });
+
+        const seen = new Set();
+        const filtered = [];
+        for (const f of processed) {
+          const key = f.label.split(' (~')[0];
+          if (!seen.has(key)) {
+            seen.add(key);
+            filtered.push(f);
+          }
+        }
+
+        const list = [
+          {
+            value: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            label: 'Best Quality (Auto MP4)',
+            ext: 'mp4'
+          },
+          ...filtered,
+          {
+            value: 'bestaudio[ext=m4a]/bestaudio',
+            label: 'Audio Only (M4A)',
+            ext: 'm4a'
+          }
+        ];
+
+        setYtFormats(list);
+      }
+    } catch (err: any) {
+      setYtAnalysisError(err.message);
+    } finally {
+      setIsAnalyzingYt(false);
+    }
+  }
+
+  // Trigger YouTube format check when URL input changes
+  useEffect(() => {
+    const isYt = inputUrl.includes('youtube.com/') || inputUrl.includes('youtu.be/');
+    if (isYt && activeDialog === 'add-job') {
+      const timer = setTimeout(() => {
+        fetchYtFormats(inputUrl);
+      }, 600);
+      return () => clearTimeout(timer);
+    } else {
+      setYtFormats([]);
+    }
+  }, [inputUrl, activeDialog]);
+
+  // Sync filename extension with selected YouTube format
+  useEffect(() => {
+    const showFormatSelector = ytFormats.length > 0;
+    if (showFormatSelector && ytFormats[ytSelectedFormatIndex]) {
+      const fmt = ytFormats[ytSelectedFormatIndex];
+      const ext = fmt.ext;
+      let currentName = inputFilename;
+      const lastDot = currentName.lastIndexOf('.');
+      if (lastDot !== -1) {
+        currentName = currentName.substring(0, lastDot);
+      }
+      if (currentName) {
+        setInputFilename(`${currentName}.${ext}`);
+      }
+    }
+  }, [ytSelectedFormatIndex, ytFormats]);
 
   const apiBase = `http://localhost:${serverPort}/api`;
   const wsUrl = `ws://localhost:${serverPort}/ws`;
@@ -168,6 +328,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
                         status: data.status,
                         error: data.error,
                         speed: 0,
+                        text: '',
                         eta: -1,
                         updatedAt: Date.now(),
                       }
@@ -214,10 +375,175 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
     }
   }, [jobs, selectedIndex]);
 
+  const selectedJob = jobs[selectedIndex];
+
   // Keyboard navigation and actions
   useInput(async (input, key) => {
+    // -----------------------------------------------------------
+    // DIALOG: ADD JOB INPUTS
+    // -----------------------------------------------------------
+    if (activeDialog === 'add-job') {
+      const showFormatSelector = ytFormats.length > 0;
+      const numFields = showFormatSelector ? 4 : 3;
+
+      if (key.escape) {
+        setActiveDialog(null);
+        return;
+      }
+      if (key.tab || key.downArrow) {
+        setFocusedField((prev) => ((prev + 1) % numFields));
+        return;
+      }
+      if (key.upArrow) {
+        setFocusedField((prev) => ((prev - 1 + numFields) % numFields));
+        return;
+      }
+
+      // Left/Right selection for format selector
+      if (showFormatSelector && focusedField === 1) {
+        if (key.leftArrow) {
+          setYtSelectedFormatIndex((prev) => (prev - 1 + ytFormats.length) % ytFormats.length);
+          return;
+        }
+        if (key.rightArrow) {
+          setYtSelectedFormatIndex((prev) => (prev + 1) % ytFormats.length);
+          return;
+        }
+      }
+
+      if (key.return) {
+        if (inputUrl.trim()) {
+          const url = inputUrl.trim();
+          const filename = inputFilename.trim();
+          const outDir = inputOutDir.trim();
+
+          setActiveDialog(null);
+          setStatusMessage('Adding download job...');
+
+          let targetUrl = url;
+          if (showFormatSelector && ytFormats[ytSelectedFormatIndex]) {
+            targetUrl = url.split('#')[0] + '#format=' + encodeURIComponent(ytFormats[ytSelectedFormatIndex].value);
+          }
+
+          try {
+            if (mode === 'local' && downloader) {
+              await downloader.addJob(targetUrl, {
+                ...(filename ? { filename } : {}),
+                ...(outDir ? { outputDir: outDir } : {}),
+              });
+            } else {
+              await fetch(`${apiBase}/jobs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  url: targetUrl,
+                  options: {
+                    ...(filename ? { filename } : {}),
+                    ...(outDir ? { outputDir: outDir } : {}),
+                  },
+                }),
+              });
+            }
+            setStatusMessage('Job added successfully!');
+          } catch (err: any) {
+            setStatusMessage(`Failed to add job: ${err.message}`);
+          }
+
+          setInputUrl('');
+          setInputFilename('');
+          setInputOutDir('');
+          setYtFormats([]);
+        } else {
+          setStatusMessage('URL is required!');
+        }
+        return;
+      }
+
+      if (key.backspace || key.delete) {
+        if (focusedField === 0) setInputUrl((p) => p.slice(0, -1));
+        else if (showFormatSelector && focusedField === 1) {
+          // Format selection is not directly editable by typing, ignore
+        } else if (focusedField === (showFormatSelector ? 2 : 1)) {
+          setInputFilename((p) => p.slice(0, -1));
+        } else if (focusedField === (showFormatSelector ? 3 : 2)) {
+          setInputOutDir((p) => p.slice(0, -1));
+        }
+        return;
+      }
+
+      // Character typing & pasting support
+      const cleanInput = input
+        .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '') // remove ANSI escape codes
+        .replace(/[\x00-\x1F\x7F-\x9F]/g, ''); // remove control codes
+      if (cleanInput.length > 0) {
+        if (focusedField === 0) {
+          setInputUrl((p) => p + cleanInput);
+        } else if (showFormatSelector && focusedField === 1) {
+          // Format selector is not editable by typing
+        } else if (focusedField === (showFormatSelector ? 2 : 1)) {
+          setInputFilename((p) => p + cleanInput);
+        } else if (focusedField === (showFormatSelector ? 3 : 2)) {
+          setInputOutDir((p) => p + cleanInput);
+        }
+      }
+      return;
+    }
+
+    // -----------------------------------------------------------
+    // DIALOG: DELETE CONFIRMATION
+    // -----------------------------------------------------------
+    if (activeDialog === 'delete-confirm') {
+      if (input === 'y' || input === 'Y') {
+        const id = confirmJobId;
+        setActiveDialog(null);
+        setConfirmJobId(null);
+        if (id) {
+          try {
+            if (mode === 'local' && downloader) {
+              await downloader.removeJob(id);
+            } else {
+              await fetch(`${apiBase}/jobs/${id}`, { method: 'DELETE' });
+            }
+            setStatusMessage('Job deleted.');
+          } catch (err: any) {
+            setStatusMessage(`Failed to delete job: ${err.message}`);
+          }
+        }
+      } else if (input === 'n' || input === 'N' || key.escape) {
+        setActiveDialog(null);
+        setConfirmJobId(null);
+      }
+      return;
+    }
+
+    // -----------------------------------------------------------
+    // STANDARD VIEW MODE KEY HANDLERS
+    // -----------------------------------------------------------
     if (input === 'q') {
       exit();
+      return;
+    }
+
+    if (input === 'a') {
+      setActiveDialog('add-job');
+      setFocusedField(0);
+      return;
+    }
+
+    if (input === 'c') {
+      try {
+        if (mode === 'local') {
+          const { clearCompletedJobs } = await import('../../store/jobs');
+          await clearCompletedJobs();
+          const localList = await listJobs();
+          setJobs(localList);
+        } else {
+          await fetch(`${apiBase}/jobs/clear-completed`, { method: 'POST' });
+        }
+        setStatusMessage('Cleared completed jobs.');
+      } catch (err: any) {
+        setStatusMessage(`Failed to clear jobs: ${err.message}`);
+      }
       return;
     }
 
@@ -235,12 +561,12 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
         if (!isRunning) {
           setStatusMessage('Starting daemon...');
           const { spawn } = await import('node:child_process');
-          const serverPath = require('node:path').join(process.cwd(), 'src/server/index.ts');
-          const stateDir = require('node:path').join(process.cwd(), '.grabr');
-          const pidFile = require('node:path').join(stateDir, 'daemon.pid');
-          const logFile = require('node:path').join(stateDir, 'daemon.log');
-          const out = require('node:fs').openSync(logFile, 'a');
-          const err = require('node:fs').openSync(logFile, 'a');
+          const serverPath = path.join(process.cwd(), 'src/server/index.ts');
+          const stateDir = path.join(homedir(), '.grabr');
+          const pidFile = path.join(stateDir, 'daemon.pid');
+          const logFile = path.join(stateDir, 'daemon.log');
+          const out = fs.openSync(logFile, 'a');
+          const err = fs.openSync(logFile, 'a');
           const child = spawn('bun', ['run', serverPath], {
             detached: true,
             stdio: ['ignore', out, err],
@@ -249,12 +575,12 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
           });
           const pid = child.pid;
           if (pid) {
-            require('node:fs').writeFileSync(pidFile, pid.toString(), 'utf-8');
+            fs.writeFileSync(pidFile, pid.toString(), 'utf-8');
           }
           child.unref();
           await new Promise((resolve) => setTimeout(resolve, 1000));
         }
-        
+
         const os = process.platform;
         const url = `http://localhost:${serverPort}`;
         const { spawn } = await import('node:child_process');
@@ -273,15 +599,30 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
     }
 
     if (jobs.length === 0) return;
-    const selectedJob = jobs[selectedIndex];
     if (!selectedJob) return;
 
     if (key.upArrow) {
       setSelectedIndex((prev) => Math.max(0, prev - 1));
     } else if (key.downArrow) {
       setSelectedIndex((prev) => Math.min(jobs.length - 1, prev + 1));
+    } else if (key.return) {
+      // Open output folder in default file manager
+      try {
+        const os = process.platform;
+        const folder = selectedJob.destination;
+        const { spawn } = await import('node:child_process');
+        if (os === 'darwin') {
+          spawn('open', [folder], { stdio: 'ignore', detached: true }).unref();
+        } else if (os === 'win32') {
+          spawn('explorer', [folder], { stdio: 'ignore', detached: true }).unref();
+        } else {
+          spawn('xdg-open', [folder], { stdio: 'ignore', detached: true }).unref();
+        }
+        setStatusMessage(`Opened folder: ${folder}`);
+      } catch (err: any) {
+        setStatusMessage(`Failed to open folder: ${err.message}`);
+      }
     } else if (input === 'p') {
-      // Pause
       if (mode === 'local' && downloader) {
         downloader.pauseJob(selectedJob.id);
       } else {
@@ -292,7 +633,6 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
         }
       }
     } else if (input === 'r') {
-      // Resume
       if (mode === 'local' && downloader) {
         downloader.resumeJob(selectedJob.id);
       } else {
@@ -303,84 +643,230 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
         }
       }
     } else if (input === 'x') {
-      // Remove
-      if (mode === 'local' && downloader) {
-        downloader.removeJob(selectedJob.id);
-      } else {
-        try {
-          await fetch(`${apiBase}/jobs/${selectedJob.id}`, { method: 'DELETE' });
-        } catch (err: any) {
-          setStatusMessage(`Failed to send remove command: ${err.message}`);
-        }
-      }
+      setConfirmJobId(selectedJob.id);
+      setActiveDialog('delete-confirm');
     }
   });
 
+  const activeDownloads = jobs.filter((j) => j.status === 'downloading');
+  const overallSpeed = activeDownloads.reduce((sum, j) => sum + j.speed, 0);
+
   return (
-    <Box flexDirection="column" padding={1} minHeight={12}>
-      {/* Title block */}
-      <Box flexDirection="row" borderStyle="single" borderColor="cyan" paddingX={2} paddingY={1} marginBottom={1} justifyContent="space-between" alignItems="center">
-        <Box flexDirection="column">
+    <Box flexDirection="column" padding={1} minHeight={18}>
+      {/* 1. Header Panel */}
+      <Box borderStyle="round" borderColor="cyan" paddingX={2} paddingY={0} marginBottom={1} flexDirection="row" justifyContent="space-between" alignItems="center">
+        <Box flexDirection="column" paddingY={1}>
           <Text color="cyan" bold>
-            {"  ____  ____    _    ____  ____  \n" +
-             " / ___||  _ \\  / \\  | __ )|  _ \\ \n" +
-             "| |  _ | |_) |/ _ \\ |  _ \\| |_) |\n" +
-             "| |_| ||  _ < / ___ \\| |_) |  _ < \n" +
-             " \\____||_| \\_\\/_/   \\_\\____/|_| \\_\\"}
+            {" █▀▀ █▀█ ▄▀█ █▄▄ █▀█\n" +
+             " █▄█ █▀▄ █▀█ █▄█ █▀▄"}
           </Text>
-          <Text color="gray">
-            {"  Modern, elegant downloader built with Bun + TypeScript"}
-          </Text>
+          <Text color="gray">  Modern local-first downloader</Text>
         </Box>
         <Box flexDirection="column" alignItems="flex-end">
-          <Text color="green" bold>
-            ● {mode === 'local' ? 'Standalone' : 'Daemon Mode'}
-          </Text>
-          <Text color="gray">
-            Port: {serverPort}
-          </Text>
-          <Text color="gray">
-            Version: v{currentVersion}
-          </Text>
+          <Box flexDirection="row">
+            <Text color="cyan" bold>● </Text>
+            <Text color="white" bold>{mode === 'local' ? 'Standalone' : 'Daemon Mode'}</Text>
+          </Box>
+          <Text color="gray">Port: {serverPort} | v{currentVersion}</Text>
+          <Box flexDirection="row">
+            <Text color="gray">Speed: </Text>
+            <Text color="yellow" bold>{formatSpeed(overallSpeed)}</Text>
+            <Text color="gray"> ({activeDownloads.length} active)</Text>
+          </Box>
         </Box>
       </Box>
 
-      {/* Version check alert */}
+      {/* 2. Version alerts */}
       {latestVersion && isNewerVersion(currentVersion, latestVersion) && (
-        <Box borderStyle="round" borderColor="green" paddingX={2} paddingY={1} marginBottom={1} flexDirection="column">
-          <Text color="green" bold>
-            ✨ New version available: v{latestVersion} (Current: v{currentVersion})
-          </Text>
-          <Text color="gray">
-            Run 'npm install -g @linuxctrl/grabr' to update to the latest version!
-          </Text>
+        <Box borderStyle="round" borderColor="green" paddingX={2} marginBottom={1}>
+          <Text color="green" bold>✨ Update Available: v{latestVersion} | npm install -g @linuxctrl/grabr</Text>
         </Box>
       )}
 
-      {/* Main Jobs Area */}
-      <Box flexDirection="column" flexGrow={1}>
-        {jobs.length === 0 ? (
-          <Box height={5} justifyContent="center" alignItems="center">
-            <Text color="gray">No downloads found. Add one to get started!</Text>
+      {/* 3. Main Split Area */}
+      {activeDialog === 'add-job' ? (
+        // Add Job Form View
+        <Box borderStyle="round" borderColor="cyan" padding={1} flexDirection="column" flexGrow={1}>
+          <Box marginBottom={1}>
+            <Text color="cyan" bold>➕ ADD NEW DOWNLOAD JOB</Text>
           </Box>
-        ) : (
-          jobs.map((job, idx) => (
-            <JobRow key={job.id} job={job} isSelected={idx === selectedIndex} />
-          ))
-        )}
-      </Box>
+          <FormInput label="URL" value={inputUrl} isFocused={focusedField === 0} placeholder="Paste link URL here..." />
+          
+          {isAnalyzingYt && (
+            <Box marginY={1}>
+              <Text color="yellow">⏳ Analyzing YouTube video formats... Please wait...</Text>
+            </Box>
+          )}
 
-      {/* Status or Connection alerts */}
+          {ytAnalysisError && (
+            <Box marginY={1}>
+              <Text color="red">✗ YouTube analysis failed: {ytAnalysisError}</Text>
+            </Box>
+          )}
+
+          {ytFormats.length > 0 && (
+            <Box flexDirection="row" marginBottom={0}>
+              <Text color={focusedField === 1 ? 'cyan' : 'gray'} bold={focusedField === 1}>
+                {focusedField === 1 ? '▶ ' : '  '}
+                {"Choose Format".padEnd(15)}:{' '}
+              </Text>
+              {focusedField === 1 ? (
+                <Box borderStyle="single" borderColor="cyan" paddingX={1}>
+                  <Text color="white" bold>◀ {ytFormats[ytSelectedFormatIndex]?.label} ▶</Text>
+                  <Text color="gray"> ({ytSelectedFormatIndex + 1}/{ytFormats.length})</Text>
+                </Box>
+              ) : (
+                <Text color="white">{ytFormats[ytSelectedFormatIndex]?.label}</Text>
+              )}
+            </Box>
+          )}
+
+          <FormInput 
+            label="Custom Name" 
+            value={inputFilename} 
+            isFocused={focusedField === (ytFormats.length > 0 ? 2 : 1)} 
+            placeholder="Custom filename (optional)..." 
+          />
+          <FormInput 
+            label="Save Dir" 
+            value={inputOutDir} 
+            isFocused={focusedField === (ytFormats.length > 0 ? 3 : 2)} 
+            placeholder="Absolute directory path (optional)..." 
+          />
+          
+          <Box marginTop={1} flexDirection="row" justifyContent="space-between">
+            <Text color="gray">
+              {focusedField === 1 && ytFormats.length > 0
+                ? '◀/▶ change format | [Tab] cycle fields'
+                : '[Tab] cycle fields'}
+            </Text>
+            <Text color="gray">[Enter] submit | [Esc] cancel</Text>
+          </Box>
+        </Box>
+      ) : activeDialog === 'delete-confirm' && confirmJobId ? (
+        // Delete Confirm View
+        <Box borderStyle="round" borderColor="red" padding={1} flexDirection="column" flexGrow={1} alignItems="center" justifyContent="center">
+          <Text color="red" bold>⚠️ DELETE CONFIRMATION</Text>
+          <Box marginY={1}>
+            <Text color="white">
+              Are you sure you want to remove "{jobs.find((j) => j.id === confirmJobId)?.filename}"?
+            </Text>
+          </Box>
+          <Box flexDirection="row">
+            <Text color="red" bold>[y] Yes, Delete</Text>
+            <Text color="gray">    |    </Text>
+            <Text color="green" bold>[n] No, Keep</Text>
+          </Box>
+        </Box>
+      ) : (
+        // Standard View: List + Details Pane
+        <Box flexDirection="row" flexGrow={1} gap={2}>
+          {/* Queue List Pane */}
+          <Box borderStyle="round" borderColor="gray" flexDirection="column" width={68} padding={0}>
+            <Box borderStyle="single" borderBottom borderColor="gray" paddingX={1}>
+              <Text color="gray" bold>QUEUE LIST ({jobs.length} jobs)</Text>
+            </Box>
+            <Box flexDirection="column" paddingY={0}>
+              {jobs.length === 0 ? (
+                <Box height={5} justifyContent="center" alignItems="center">
+                  <Text color="gray">No jobs in queue. Press 'a' to add one!</Text>
+                </Box>
+              ) : (
+                jobs.map((job, idx) => (
+                  <JobRow key={job.id} job={job} isSelected={idx === selectedIndex} />
+                ))
+              )}
+            </Box>
+          </Box>
+
+          {/* Details Pane */}
+          <Box borderStyle="round" borderColor="gray" flexDirection="column" flexGrow={1} padding={1}>
+            <Box marginBottom={1}>
+              <Text color="gray" bold>JOB DETAILS</Text>
+            </Box>
+            {selectedJob ? (
+              <Box flexDirection="column">
+                <Box marginBottom={1}>
+                  <Text color="cyan" bold wrap="truncate-end">{selectedJob.filename}</Text>
+                </Box>
+                <Box marginBottom={1}>
+                  <Text color="gray">ID: {selectedJob.id}</Text>
+                </Box>
+                
+                <Box flexDirection="row" justifyContent="space-between">
+                  <Text color="gray">Status:</Text>
+                  <Text color="white" bold>{selectedJob.status.toUpperCase()}</Text>
+                </Box>
+
+                <Box flexDirection="row" justifyContent="space-between">
+                  <Text color="gray">Size:</Text>
+                  <Text color="white">
+                    {formatBytes(selectedJob.downloadedBytes)} / {selectedJob.totalBytes > 0 ? formatBytes(selectedJob.totalBytes) : 'Unknown'}
+                  </Text>
+                </Box>
+
+                {selectedJob.status === 'downloading' && (
+                  <>
+                    <Box flexDirection="row" justifyContent="space-between">
+                      <Text color="gray">Speed:</Text>
+                      <Text color="yellow" bold>{formatSpeed(selectedJob.speed)}</Text>
+                    </Box>
+                    <Box flexDirection="row" justifyContent="space-between">
+                      <Text color="gray">ETA:</Text>
+                      <Text color="yellow" bold>{formatETA(selectedJob.eta)}</Text>
+                    </Box>
+                  </>
+                )}
+
+                <Box flexDirection="column" marginTop={1}>
+                  <Text color="gray">Save Destination:</Text>
+                  <Text color="white" wrap="truncate-middle">{selectedJob.destination}</Text>
+                </Box>
+
+                {/* Worker chunks visualizer */}
+                {selectedJob.chunks && selectedJob.chunks.length > 0 && (
+                  <Box flexDirection="column" marginTop={1}>
+                    <Text color="gray">Worker Chunks:</Text>
+                    <Box flexDirection="row" flexWrap="wrap" marginTop={0}>
+                      {selectedJob.chunks.map((chunk, idx) => {
+                        let char = '░';
+                        let color = 'gray';
+                        if (chunk.status === 'done') {
+                          char = '█';
+                          color = 'green';
+                        } else if (chunk.status === 'downloading') {
+                          char = '▒';
+                          color = 'yellow';
+                        } else if (chunk.status === 'failed') {
+                          char = '✗';
+                          color = 'red';
+                        }
+                        return <Text key={idx} color={color}>{char}</Text>;
+                      })}
+                    </Box>
+                  </Box>
+                )}
+              </Box>
+            ) : (
+              <Box height={5} justifyContent="center" alignItems="center">
+                <Text color="gray" italic>Select a job to view details</Text>
+              </Box>
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {/* 4. Status Log Message */}
       {statusMessage && (
         <Box marginTop={1} paddingX={1}>
           <Text color="yellow">⚠️ {statusMessage}</Text>
         </Box>
       )}
 
-      {/* Footer shortcut bar */}
+      {/* 5. Footer Shortcut Legend */}
       <Box borderStyle="double" borderColor="gray" paddingX={1} marginTop={1} flexDirection="row" justifyContent="space-between">
         <Text color="gray">
-          <Text color="cyan" bold>q</Text> quit  |  <Text color="cyan" bold>o</Text> open in browser  |  <Text color="cyan" bold>p</Text> pause  |  <Text color="cyan" bold>r</Text> resume  |  <Text color="cyan" bold>x</Text> delete  |  <Text color="cyan" bold>↑↓</Text> navigate
+          <Text color="cyan" bold>q</Text> quit | <Text color="cyan" bold>a</Text> add job | <Text color="cyan" bold>p</Text> pause | <Text color="cyan" bold>r</Text> resume | <Text color="cyan" bold>x</Text> delete | <Text color="cyan" bold>c</Text> clear completed | <Text color="cyan" bold>Enter</Text> open folder | <Text color="cyan" bold>o</Text> web ui | <Text color="cyan" bold>↑↓</Text> navigate
         </Text>
         <Text color="gray">
           Total: {jobs.length} jobs

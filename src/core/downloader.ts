@@ -1,6 +1,8 @@
 import { EventEmitter } from 'node:events';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { existsSync, mkdirSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { nanoid } from 'nanoid';
 import { getFileMetadata } from './chunker';
 import { downloadChunk } from './worker';
@@ -8,6 +10,7 @@ import { mergeChunks } from './merger';
 import { saveResumeState, deleteResumeState, loadResumeState } from './resume';
 import { createJob, updateJob, getJob, listJobs, deleteJob } from '../store/jobs';
 import { loadConfig, type GrabrConfig } from './config';
+import { isYouTubeUrl, getYouTubeMetadata } from './youtube';
 import type { DownloadJob, ChunkInfo, JobStatus, DownloadOptions } from './types';
 
 export class SpeedMeter {
@@ -157,7 +160,27 @@ export class Downloader extends EventEmitter {
     mkdirSync(outputDir, { recursive: true });
 
     const numChunks = options?.chunks || this.config.defaultChunks;
-    const metadata = await getFileMetadata(url, numChunks, options?.filename);
+    
+    let metadata;
+    if (isYouTubeUrl(url)) {
+      const ytMeta = await getYouTubeMetadata(url);
+      metadata = {
+        filename: options?.filename || ytMeta.filename,
+        totalBytes: ytMeta.totalBytes,
+        acceptRanges: false,
+        chunks: [
+          {
+            index: 0,
+            start: 0,
+            end: ytMeta.totalBytes > 0 ? ytMeta.totalBytes - 1 : 0,
+            downloaded: 0,
+            status: 'pending' as const,
+          }
+        ]
+      };
+    } else {
+      metadata = await getFileMetadata(url, numChunks, options?.filename);
+    }
 
     const filename = resolveFilenameCollision(outputDir, metadata.filename);
 
@@ -266,6 +289,11 @@ export class Downloader extends EventEmitter {
 
   private async runJob(job: DownloadJob): Promise<void> {
     const abortController = new AbortController();
+
+    if (isYouTubeUrl(job.url)) {
+      return this.runYouTubeJob(job, abortController);
+    }
+
     const speedMeter = new SpeedMeter(job.downloadedBytes);
 
     job.status = 'downloading';
@@ -276,7 +304,7 @@ export class Downloader extends EventEmitter {
 
     this.activeJobs.set(job.id, { job, abortController, speedMeter });
 
-    const tmpDir = join(process.cwd(), '.grabr', 'tmp', job.id);
+    const tmpDir = join(homedir(), '.grabr', 'tmp', job.id);
     const partPaths: string[] = [];
 
     try {
@@ -362,6 +390,181 @@ export class Downloader extends EventEmitter {
         if (chunk.status === 'downloading') {
           chunk.status = 'failed';
         }
+      }
+
+      await updateJob(job);
+      saveResumeState(job);
+
+      this.emit('job:status', { jobId: job.id, status: 'failed', error: job.error });
+    } finally {
+      this.processQueue();
+    }
+  }
+
+  private async runYouTubeJob(job: DownloadJob, abortController: AbortController): Promise<void> {
+    job.status = 'downloading';
+    job.updatedAt = Date.now();
+    await updateJob(job);
+    saveResumeState(job);
+    this.emit('job:status', { jobId: job.id, status: 'downloading' });
+
+    this.activeJobs.set(job.id, { job, abortController, speedMeter: new SpeedMeter() });
+
+    try {
+      const finalDest = join(job.destination, job.filename);
+      
+      // Extract format selection from URL hash (transparent config channel)
+      let formatSelection = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+      if (job.url.includes('#format=')) {
+        const parts = job.url.split('#format=');
+        formatSelection = decodeURIComponent(parts[1] || '');
+      }
+      
+      const cleanUrl = job.url.split('#')[0] || '';
+      
+      const child: any = spawn('yt-dlp', [
+        '-f', formatSelection,
+        '--merge-output-format', 'mp4',
+        '-o', finalDest,
+        '--newline',
+        cleanUrl
+      ]);
+
+      abortController.signal.addEventListener('abort', () => {
+        child.kill();
+      });
+
+      let stderr = '';
+
+      child.stderr.on('data', (data: any) => {
+        stderr += data.toString();
+      });
+
+      child.stdout.on('data', async (data: any) => {
+        const lines = data.toString().split('\n');
+        for (const line of lines) {
+          if (!line.includes('[download]')) continue;
+
+          // Parse percent
+          const pctMatch = line.match(/([\d.]+)%/);
+          const percent = pctMatch ? parseFloat(pctMatch[1]) : 0;
+
+          // Parse total size if we don't have it
+          if (job.totalBytes === 0) {
+            const sizeMatch = line.match(/of\s+(?:~)?([\d.]+)(KiB|MiB|GiB|B)/);
+            if (sizeMatch) {
+              const val = parseFloat(sizeMatch[1]);
+              const unit = sizeMatch[2];
+              let sizeBytes = 0;
+              if (unit === 'KiB') sizeBytes = val * 1024;
+              else if (unit === 'MiB') sizeBytes = val * 1024 * 1024;
+              else if (unit === 'GiB') sizeBytes = val * 1024 * 1024 * 1024;
+              else sizeBytes = val;
+              job.totalBytes = Math.round(sizeBytes);
+              if (job.chunks[0]) {
+                job.chunks[0].end = job.totalBytes > 0 ? job.totalBytes - 1 : 0;
+              }
+            }
+          }
+
+          // Parse speed
+          const speedMatch = line.match(/at\s+([\d.]+)(KiB|MiB|GiB|B)\/s/);
+          let speedBytes = 0;
+          if (speedMatch) {
+            const val = parseFloat(speedMatch[1]);
+            const unit = speedMatch[2];
+            if (unit === 'KiB') speedBytes = val * 1024;
+            else if (unit === 'MiB') speedBytes = val * 1024 * 1024;
+            else if (unit === 'GiB') speedBytes = val * 1024 * 1024 * 1024;
+            else speedBytes = val;
+          }
+
+          // Parse ETA
+          const etaMatch = line.match(/ETA\s+([\d:]+)/);
+          let etaSeconds = -1;
+          if (etaMatch) {
+            const parts = etaMatch[1].split(':').map(Number);
+            if (parts.length === 2) {
+              etaSeconds = parts[0] * 60 + parts[1];
+            } else if (parts.length === 3) {
+              etaSeconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
+            }
+          }
+
+          // Update downloadedBytes
+          if (percent > 0 && job.totalBytes > 0) {
+            job.downloadedBytes = Math.round((percent / 100) * job.totalBytes);
+            if (job.chunks[0]) {
+              job.chunks[0].downloaded = job.downloadedBytes;
+              if (percent >= 100) {
+                job.chunks[0].status = 'done';
+              } else {
+                job.chunks[0].status = 'downloading';
+              }
+            }
+          }
+
+          job.speed = Math.round(speedBytes);
+          job.eta = etaSeconds;
+          job.updatedAt = Date.now();
+
+          await updateJob(job);
+          saveResumeState(job);
+
+          this.emit('job:progress', {
+            jobId: job.id,
+            downloadedBytes: job.downloadedBytes,
+            totalBytes: job.totalBytes,
+            speed: job.speed,
+            eta: job.eta,
+            chunks: job.chunks,
+          });
+        }
+      });
+
+      const exitCode = await new Promise<number>((resolve) => {
+        child.on('close', resolve);
+      });
+
+      this.activeJobs.delete(job.id);
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      if (exitCode !== 0) {
+        throw new Error(`yt-dlp failed: ${stderr.trim() || 'Exit code ' + exitCode}`);
+      }
+
+      job.status = 'completed';
+      job.speed = 0;
+      job.eta = 0;
+      job.downloadedBytes = job.totalBytes;
+      job.updatedAt = Date.now();
+      if (job.chunks[0]) {
+        job.chunks[0].status = 'done';
+        job.chunks[0].downloaded = job.totalBytes;
+      }
+
+      await updateJob(job);
+      deleteResumeState(job.id);
+
+      this.emit('job:status', { jobId: job.id, status: 'completed' });
+
+    } catch (err: any) {
+      this.activeJobs.delete(job.id);
+
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      job.status = 'failed';
+      job.speed = 0;
+      job.eta = -1;
+      job.error = err.message || 'Unknown YouTube download error';
+      job.updatedAt = Date.now();
+      if (job.chunks[0]) {
+        job.chunks[0].status = 'failed';
       }
 
       await updateJob(job);

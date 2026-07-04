@@ -74,6 +74,133 @@ if (downloadUrl) {
     outputDirInput.value = settings.defaultOutputDir;
 
     checkDownloadDaemonStatus(btnGrabr, errorAlert);
+
+    // 1. YouTube Formats Fetcher & Selector
+    const isYoutube = downloadUrl.includes('youtube.com/') || downloadUrl.includes('youtu.be/');
+    if (isYoutube) {
+      const ytFormatGroup = document.getElementById('yt-format-group');
+      const ytFormatSelect = document.getElementById('yt-format');
+      ytFormatGroup.style.display = 'flex';
+      
+      btnGrabr.setAttribute('disabled', 'true');
+      btnGrabr.textContent = 'Analyzing Link...';
+      
+      fetch(`${serverUrl}/api/youtube/formats?url=${encodeURIComponent(downloadUrl)}`)
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(await response.text() || 'Failed to query daemon');
+          }
+          return response.json();
+        })
+        .then((info) => {
+          if (info.title && !filenameInput.value) {
+            filenameInput.value = info.title.replace(/[|\\/:*?"<>]/g, '_').trim();
+          }
+          
+          ytFormatSelect.innerHTML = '';
+          
+          // Add default option first
+          const defaultOpt = document.createElement('option');
+          defaultOpt.value = 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best';
+          defaultOpt.textContent = 'Best Quality (Auto MP4)';
+          defaultOpt.dataset.ext = 'mp4';
+          ytFormatSelect.appendChild(defaultOpt);
+
+          const formats = info.formats || [];
+          
+          // Filter video formats
+          const videoFormats = formats.filter(f => f.vcodec && f.vcodec !== 'none');
+          
+          // Process and sort video formats
+          const processedVideo = videoFormats.map(f => {
+            const isCombined = f.acodec && f.acodec !== 'none';
+            const res = f.height ? `${f.height}p` : (f.resolution || 'unknown');
+            const fpsStr = f.fps && f.fps > 30 ? `${f.fps}fps` : '';
+            const size = f.filesize || f.filesize_approx || 0;
+            return {
+              id: f.format_id,
+              height: f.height || 0,
+              fps: f.fps || 0,
+              ext: f.ext,
+              isCombined: isCombined,
+              res: res,
+              fpsStr: fpsStr,
+              size: size,
+              url: f.url,
+              value: isCombined ? f.format_id : `${f.format_id}+bestaudio[ext=m4a]/bestaudio`
+            };
+          });
+
+          // Sort by height descending, then combined first, then size descending
+          processedVideo.sort((a, b) => {
+            if (b.height !== a.height) return b.height - a.height;
+            if (b.isCombined !== a.isCombined) return (b.isCombined ? 1 : 0) - (a.isCombined ? 1 : 0);
+            return b.size - a.size;
+          });
+
+          // Filter duplicates (same height, ext, isCombined)
+          const seen = new Set();
+          const filteredVideo = [];
+          processedVideo.forEach(f => {
+            const key = `${f.height}_${f.ext}_${f.isCombined}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              filteredVideo.push(f);
+            }
+          });
+
+          if (filteredVideo.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No video formats available';
+            ytFormatSelect.appendChild(opt);
+          } else {
+            filteredVideo.forEach(f => {
+              const opt = document.createElement('option');
+              opt.value = f.value;
+              const sizeStr = f.size > 0 ? ` (~${formatBytes(f.size)})` : '';
+              const typeStr = f.isCombined ? 'Direct' : 'Merged + Audio';
+              opt.textContent = `${f.ext.toUpperCase()} ${f.res} ${f.fpsStr ? f.fpsStr + ' ' : ''}(${typeStr})${sizeStr}`;
+              opt.dataset.ext = 'mp4'; // Merge output is mp4
+              opt.dataset.url = f.url;
+              ytFormatSelect.appendChild(opt);
+            });
+          }
+
+          // Add audio-only option
+          const bestAudioOpt = document.createElement('option');
+          bestAudioOpt.value = 'bestaudio[ext=m4a]/bestaudio';
+          bestAudioOpt.textContent = 'Audio Only (M4A)';
+          bestAudioOpt.dataset.ext = 'm4a';
+          ytFormatSelect.appendChild(bestAudioOpt);
+          
+          const updateExtension = () => {
+            const selectedOpt = ytFormatSelect.options[ytFormatSelect.selectedIndex];
+            if (selectedOpt && selectedOpt.dataset.ext) {
+              const ext = selectedOpt.dataset.ext;
+              let currentName = filenameInput.value;
+              const lastDot = currentName.lastIndexOf('.');
+              if (lastDot !== -1) {
+                currentName = currentName.substring(0, lastDot);
+              }
+              filenameInput.value = `${currentName}.${ext}`;
+            }
+          };
+          
+          ytFormatSelect.addEventListener('change', updateExtension);
+          updateExtension();
+          
+          btnGrabr.removeAttribute('disabled');
+          btnGrabr.textContent = 'Send to Grabr';
+        })
+        .catch((err) => {
+          console.error('Failed to fetch formats:', err);
+          errorAlert.textContent = `YouTube analyzer failed: ${err.message}. (Make sure Grabr Desktop is running!)`;
+          errorAlert.style.display = 'block';
+          btnGrabr.setAttribute('disabled', 'true');
+          btnGrabr.textContent = 'Error';
+        });
+    }
   });
 
   btnCancel.addEventListener('click', () => window.close());
@@ -101,15 +228,24 @@ if (downloadUrl) {
     if (outputDir) options.outputDir = outputDir;
     options.chunks = chunks;
 
+    // Resolve target URL (append selected format to YouTube URL hash, source URL otherwise)
+    let targetUrl = downloadUrl;
+    const isYoutube = downloadUrl.includes('youtube.com/') || downloadUrl.includes('youtu.be/');
+    if (isYoutube) {
+      const ytFormatSelect = document.getElementById('yt-format');
+      if (ytFormatSelect && ytFormatSelect.value) {
+        targetUrl = downloadUrl.split('#')[0] + '#format=' + encodeURIComponent(ytFormatSelect.value);
+      }
+    }
+
     try {
       const response = await fetch(`${serverUrl}/api/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: downloadUrl, options })
+        body: JSON.stringify({ url: targetUrl, options })
       });
 
       if (response.ok) {
-        // Trigger a badge update immediately
         chrome.runtime.sendMessage({ type: 'update_badge' }, () => {
           window.close();
         });
@@ -118,10 +254,24 @@ if (downloadUrl) {
         throw new Error(errMsg || `Status ${response.status}`);
       }
     } catch (err) {
-      btnGrabr.removeAttribute('disabled');
-      btnGrabr.textContent = 'Send to Grabr';
-      errorAlert.textContent = `Failed to start download: ${err.message}`;
-      errorAlert.style.display = 'block';
+      console.warn('HTTP post failed in popup, trying native messaging fallback:', err);
+      chrome.runtime.sendNativeMessage('org.grabr.desktop', {
+        url: targetUrl,
+        filename: filename || '',
+        chunks: chunks
+      }, (nativeResponse) => {
+        if (chrome.runtime.lastError) {
+          btnGrabr.removeAttribute('disabled');
+          btnGrabr.textContent = 'Send to Grabr';
+          errorAlert.textContent = `Failed to start download: ${err.message} (Native messaging: ${chrome.runtime.lastError.message})`;
+          errorAlert.style.display = 'block';
+        } else {
+          console.log('Native messaging popup fallback succeeded:', nativeResponse);
+          chrome.runtime.sendMessage({ type: 'update_badge' }, () => {
+            window.close();
+          });
+        }
+      });
     }
   });
 

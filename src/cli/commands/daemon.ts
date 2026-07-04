@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { writeFileSync, existsSync, openSync, readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 
 function isProcessRunning(pid: number): boolean {
   try {
@@ -13,7 +14,7 @@ function isProcessRunning(pid: number): boolean {
 
 export async function daemonCommand(args: string[]) {
   const action = args[0] || 'start';
-  const stateDir = join(process.cwd(), '.grabr');
+  const stateDir = join(homedir(), '.grabr');
   const pidFile = join(stateDir, 'daemon.pid');
   const logFile = join(stateDir, 'daemon.log');
 
