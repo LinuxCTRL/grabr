@@ -1,0 +1,30 @@
+[package]
+name = "grabr-desktop"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["cors", "fs"] }
+eframe = "0.29"
+tray-icon = "0.19"
+notify-rust = "4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+futures-util = "0.3"
+tokio-stream = "0.1"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+chrono = { version = "0.4", features = ["serde"] }
+percent-encoding = "2.3"
+urlencoding = "2.1"
+mime_guess = "2.0"
+dirs = "6.0"
+gtk = "0.18"
+image = { version = "0.25", default-features = false, features = ["png"] }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }

@@ -64,13 +64,17 @@ app.get(
   }))
 );
 
-// REST API routes
 app.get('/api/version', async (c) => {
   try {
-    const packageJson = await import('../../package.json');
+    const packageJson = require('../../package.json');
     return c.json({ version: packageJson.version });
   } catch {
-    return c.json({ version: '1.0.9' });
+    try {
+      const packageJson = require('../package.json');
+      return c.json({ version: packageJson.version });
+    } catch {
+      return c.json({ version: '1.0.11' });
+    }
   }
 });
 
