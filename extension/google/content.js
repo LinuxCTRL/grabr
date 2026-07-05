@@ -48,25 +48,34 @@ function injectBadge(video) {
     e.stopPropagation();
     e.preventDefault();
 
-    const videoUrl = video.src || '';
-    if (videoUrl && !videoUrl.startsWith('blob:')) {
-      const filename = guessFilename(videoUrl, document.title + '.mp4');
-      chrome.runtime.sendMessage({
-        type: 'open_grabr_popup',
-        url: videoUrl,
-        filename: filename,
-        sizeBytes: 0
-      });
-    } else {
-      // YouTube uses blob URLs, so let's send page URL if blob is detected
-      const pageUrl = window.location.href;
-      const filename = document.title ? document.title.replace(/[|\\/:*?"<>]/g, '') + '.mp4' : 'download.mp4';
-      chrome.runtime.sendMessage({
-        type: 'open_grabr_popup',
-        url: pageUrl,
-        filename: filename,
-        sizeBytes: 0
-      });
+    try {
+      if (!chrome.runtime || !chrome.runtime.id) {
+        throw new Error("Grabr Extension context is invalidated.");
+      }
+
+      const videoUrl = video.src || '';
+      if (videoUrl && !videoUrl.startsWith('blob:')) {
+        const filename = guessFilename(videoUrl, document.title + '.mp4');
+        chrome.runtime.sendMessage({
+          type: 'open_grabr_popup',
+          url: videoUrl,
+          filename: filename,
+          sizeBytes: 0
+        });
+      } else {
+        // YouTube uses blob URLs, so let's send page URL if blob is detected
+        const pageUrl = window.location.href;
+        const filename = document.title ? document.title.replace(/[|\\/:*?"<>]/g, '') + '.mp4' : 'download.mp4';
+        chrome.runtime.sendMessage({
+          type: 'open_grabr_popup',
+          url: pageUrl,
+          filename: filename,
+          sizeBytes: 0
+        });
+      }
+    } catch (err) {
+      alert("Grabr Extension has been reloaded or updated. Please refresh the page to continue!");
+      console.error(err);
     }
   });
 

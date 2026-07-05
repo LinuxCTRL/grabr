@@ -121,7 +121,7 @@ if (downloadUrl) {
               id: f.format_id,
               height: f.height || 0,
               fps: f.fps || 0,
-              ext: f.ext,
+              ext: f.ext || 'mp4',
               isCombined: isCombined,
               res: res,
               fpsStr: fpsStr,

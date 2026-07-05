@@ -138,13 +138,14 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
         
         const processed = videoFormats.map((f: any) => {
           const isCombined = f.acodec && f.acodec !== 'none';
+          const formatExt = f.ext || 'mp4';
           const res = f.height ? `${f.height}p` : (f.resolution || 'unknown');
           const fpsStr = f.fps && f.fps > 30 ? `${f.fps}fps` : '';
           const size = f.filesize || f.filesize_approx || 0;
           return {
             value: isCombined ? f.format_id : `${f.format_id}+bestaudio[ext=m4a]/bestaudio`,
-            label: `${f.ext.toUpperCase()} ${res} ${fpsStr ? fpsStr + ' ' : ''}(${isCombined ? 'Direct' : 'Merged + Audio'})${size > 0 ? ` (~${formatBytes(size)})` : ''}`,
-            ext: isCombined ? f.ext : 'mp4'
+            label: `${formatExt.toUpperCase()} ${res} ${fpsStr ? fpsStr + ' ' : ''}(${isCombined ? 'Direct' : 'Merged + Audio'})${size > 0 ? ` (~${formatBytes(size)})` : ''}`,
+            ext: isCombined ? formatExt : 'mp4'
           };
         });
 
