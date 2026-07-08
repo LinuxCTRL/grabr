@@ -1,9 +1,0 @@
-[Desktop Entry]
-Name=Grabr Desktop
-Exec=grabr-desktop
-Icon=grabr-desktop
-Type=Application
-Categories=Network;FileTransfer;
-Comment=Modern, elegant file downloader
-Terminal=false
-StartupWMClass=grabr-desktop

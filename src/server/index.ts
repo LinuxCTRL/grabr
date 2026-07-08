@@ -6,7 +6,11 @@ import { serveStatic } from 'hono/bun';
 import { Downloader } from '../core/downloader';
 import { listJobs, getJob, clearCompletedJobs } from '../store/jobs';
 import { loadConfig } from '../core/config';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const config = loadConfig();
 const port = config.serverPort;
@@ -65,17 +69,8 @@ app.get(
 );
 
 app.get('/api/version', async (c) => {
-  try {
-    const packageJson = require('../../package.json');
-    return c.json({ version: packageJson.version });
-  } catch {
-    try {
-      const packageJson = require('../package.json');
-      return c.json({ version: packageJson.version });
-    } catch {
-      return c.json({ version: '1.0.11' });
-    }
-  }
+  const version = process.env.GRABR_VERSION;
+  return c.json({ version: version || '1.0.11' });
 });
 
 app.get('/api/jobs', async (c) => {
@@ -168,7 +163,7 @@ app.get('/api/youtube/formats', async (c) => {
 });
 
 // Serve Web UI static files
-app.use('/*', serveStatic({ root: './src/server/static' }));
+app.use('/*', serveStatic({ root: join(__dirname, 'static') }));
 
 console.log(`Starting Grabr server on http://localhost:${port}`);
 

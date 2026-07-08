@@ -1,7 +1,8 @@
 import { spawn } from 'node:child_process';
 import { writeFileSync, existsSync, openSync, readFileSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 function isProcessRunning(pid: number): boolean {
   try {
@@ -32,8 +33,18 @@ export async function daemonCommand(args: string[]) {
       }
     }
 
+    const __filename = fileURLToPath(import.meta.url);
+    const scriptDir = dirname(__filename);
+    const serverPath = (() => {
+      // Bundled: dist/server.js is alongside dist/cli.js
+      const bundled = join(scriptDir, 'server.js');
+      if (existsSync(bundled)) return bundled;
+      // Dev: running from src/cli/commands/daemon.ts
+      return join(scriptDir, '..', '..', '..', 'dist', 'server.js');
+    })();
+
     console.log('Starting grabr daemon in background...');
-    const serverPath = join(process.cwd(), 'src/server/index.ts');
+    console.log(`  Server: ${serverPath}`);
 
     const out = openSync(logFile, 'a');
     const err = openSync(logFile, 'a');

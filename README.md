@@ -4,7 +4,7 @@
   <img src="./src/web/logo.png" alt="Grabr Logo" width="128" height="128" style="border-radius: 28px;" />
 </p>
 
-> A modern, elegant file downloader — CLI tool, Node.js/Bun library, and a **100% native Rust desktop app** (`grabr-desktop`).
+> A modern, elegant file downloader — CLI tool, Node.js/Bun library, and web UI.
 
 ![CLI Dashboard](https://img.shields.io/badge/Bun-Node.js-blue)
 [![npm version](https://img.shields.io/npm/v/@linuxctrl/grabr)](https://www.npmjs.com/package/@linuxctrl/grabr)
@@ -12,21 +12,20 @@
 
 ## Interface Gallery
 
-| TUI Dashboard | Desktop GUI | Web UI Dashboard |
-| :---: | :---: | :---: |
-| ![TUI Dashboard](./screenshots/grabr-cli.png) | ![Desktop GUI](./screenshots/grabr-desktop.png) | ![Web UI Dashboard](./screenshots/grabr-web.png) |
+| TUI Dashboard | Web UI Dashboard |
+| :---: | :---: |
+| ![TUI Dashboard](./screenshots/grabr-cli.png) | ![Web UI Dashboard](./screenshots/grabr-web.png) |
 
 grabr is a local-first download manager featuring chunked parallel downloading, resumable transfers, and automatic database synchronization across all platforms. No cloud, no tracking.
 
 ### Key Features:
-* **Native Desktop App (`grabr-desktop`):** 100% native Rust client built with `egui` featuring a complete graphical interface, active downloads visualizer, and global system tray integration.
-* **Unified Database Sync:** Both the CLI, Bun/Hono daemon, and Rust desktop app automatically read/write to the same SQLite database file (`~/.grabr/grabr.db`), keeping downloads instantly synced.
+* **Unified Database Sync:** The CLI, Bun/Hono daemon, and web UI all read/write to the same SQLite database file (`~/.grabr/grabr.db`), keeping downloads instantly synced.
 * **YouTube Format Selector:** Intercepts YouTube links in browser extensions, Web UI, and the CLI to present a format selector for combined video resolutions (4K, 1080p, 720p, etc.) or audio-only downloads.
 * **Interactive CLI Dashboard:** Responsive split-pane TUI dashboard with live chunk visualizer, inline job addition form, delete confirmation prompts, and shortcuts to open target save directories.
 * **Browser Integration:** Route browser downloads directly to the Grabr daemon using custom extensions for Chrome, Edge, and Firefox.
 * **Version Checking:** Automatically alerts you in both the CLI dashboard and Web UI when a newer release of Grabr is available on NPM.
 
-**Works with:** Node.js ≥18, Bun ≥1.0, Rust (edition 2021)
+**Works with:** Node.js ≥18, Bun ≥1.0
 
 ---
 
@@ -38,18 +37,21 @@ npm install -g @linuxctrl/grabr          # CLI globally
 npm install @linuxctrl/grabr             # or as a library
 ```
 
-### Native Desktop App (Rust)
-To build the desktop application from source:
-```bash
-cd grabr-desktop
-cargo build --release
-# Standalone binary is generated at: target/release/grabr-desktop
-```
+### YouTube Support (yt-dlp)
+
+[yt-dlp](https://github.com/yt-dlp/yt-dlp) is required for downloading YouTube videos and fetching format metadata. Install it with your package manager:
+
+| OS | Command |
+| :-- | :------ |
+| **macOS** | `brew install yt-dlp` |
+| **Linux** | `sudo apt install yt-dlp` _(Debian/Ubuntu)_ or `sudo pacman -S yt-dlp` _(Arch)_ or `pip install yt-dlp` |
+| **Windows** | `winget install yt-dlp` or `pip install yt-dlp` |
+
+Make sure `yt-dlp` is available on your `PATH`. Verify with `yt-dlp --version`.
 
 ---
 
 ## CLI Usage
-
 ```bash
 grabr --help
 
@@ -170,7 +172,6 @@ interface ChunkInfo {
 
 ```
 grabr/
-├── grabr-desktop/               # Native Rust desktop app (egui GUI)
 ├── dist/                        # Built output (published to npm)
 │   ├── index.js                 #   ESM library
 │   ├── index.cjs                #   CJS library

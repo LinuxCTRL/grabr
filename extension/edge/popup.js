@@ -195,7 +195,7 @@ if (downloadUrl) {
         })
         .catch((err) => {
           console.error('Failed to fetch formats:', err);
-          errorAlert.textContent = `YouTube analyzer failed: ${err.message}. (Make sure Grabr Desktop is running!)`;
+          errorAlert.textContent = `YouTube analyzer failed: ${err.message}. (Make sure grabr daemon is running!)`;
           errorAlert.style.display = 'block';
           btnGrabr.setAttribute('disabled', 'true');
           btnGrabr.textContent = 'Error';
@@ -254,24 +254,10 @@ if (downloadUrl) {
         throw new Error(errMsg || `Status ${response.status}`);
       }
     } catch (err) {
-      console.warn('HTTP post failed in popup, trying native messaging fallback:', err);
-      chrome.runtime.sendNativeMessage('org.grabr.desktop', {
-        url: targetUrl,
-        filename: filename || '',
-        chunks: chunks
-      }, (nativeResponse) => {
-        if (chrome.runtime.lastError) {
-          btnGrabr.removeAttribute('disabled');
-          btnGrabr.textContent = 'Send to Grabr';
-          errorAlert.textContent = `Failed to start download: ${err.message} (Native messaging: ${chrome.runtime.lastError.message})`;
-          errorAlert.style.display = 'block';
-        } else {
-          console.log('Native messaging popup fallback succeeded:', nativeResponse);
-          chrome.runtime.sendMessage({ type: 'update_badge' }, () => {
-            window.close();
-          });
-        }
-      });
+      btnGrabr.removeAttribute('disabled');
+      btnGrabr.textContent = 'Send to Grabr';
+      errorAlert.textContent = `Failed to start download: ${err.message}. Make sure grabr daemon is running (grabr daemon start)`;
+      errorAlert.style.display = 'block';
     }
   });
 

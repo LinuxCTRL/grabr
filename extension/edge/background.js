@@ -141,25 +141,7 @@ function batchDownloadLinks(text) {
           throw new Error(`HTTP status ${response.status}`);
         }
       } catch (err) {
-        console.warn('HTTP post failed, trying native messaging fallback:', err);
-        const success = await new Promise((resolve) => {
-          chrome.runtime.sendNativeMessage('org.grabr.desktop', {
-            url: url,
-            filename: filename || '',
-            chunks: settings.defaultChunks
-          }, (res) => {
-            if (chrome.runtime.lastError) {
-              console.error('Native messaging also failed:', chrome.runtime.lastError.message);
-              resolve(false);
-            } else {
-              console.log('Native messaging fallback succeeded:', res);
-              resolve(res && res.success);
-            }
-          });
-        });
-        if (success) {
-          successCount++;
-        }
+        console.warn('Failed to send to Grabr daemon:', err);
       }
     }
 

@@ -4,8 +4,6 @@ grabr-tauri/
 .flatpak-builder/
 build-dir/
 repo/
-grabr-desktop/target/
-grabr-desktop/.grabr/
 *.flatpak
 # dependencies (bun install)
 node_modules
@@ -35,7 +33,6 @@ publish-plan.md
 .cache
 *.tsbuildinfo
 
-./grabr-desktop-linux-amd64.tar.gz
 # IntelliJ based IDEs
 .idea
 

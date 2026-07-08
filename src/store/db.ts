@@ -1,6 +1,7 @@
 import type { SqlJsStatic, Database as SqlJsDatabase } from 'sql.js';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { join, dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 
 const stateDir = join(homedir(), '.grabr');
@@ -18,7 +19,14 @@ async function init(): Promise<void> {
 
   initPromise = (async () => {
     const initSqlJs = (await import('sql.js')).default;
-    SQL = await initSqlJs();
+    SQL = await initSqlJs({
+      locateFile: (file: string) => {
+        const dir = dirname(fileURLToPath(import.meta.url));
+        const localWasm = resolve(dir, file);
+        if (existsSync(localWasm)) return localWasm;
+        return resolve(dir, '..', 'node_modules', 'sql.js', 'dist', file);
+      },
+    });
 
     if (existsSync(dbPath)) {
       const buffer = readFileSync(dbPath);
