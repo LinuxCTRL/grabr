@@ -1,6 +1,6 @@
 {
   "name": "@linuxctrl/grabr",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "A modern, elegant file downloader — CLI & library for Bun and Node.js",
   "type": "module",
   "main": "./dist/index.cjs",
