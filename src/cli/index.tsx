@@ -9,6 +9,7 @@ import { removeCommand } from './commands/remove';
 import { clearCommand } from './commands/clear';
 import { uiCommand } from './commands/ui';
 import { daemonCommand } from './commands/daemon';
+import { extensionsCommand } from './commands/extensions';
 import { Dashboard } from './ui/Dashboard';
 import { Downloader } from '../core/downloader';
 import { loadConfig } from '../core/config';
@@ -46,6 +47,11 @@ function showHelp() {
     ui              Open the Web UI in your default browser.
     daemon [start|stop|status]
                     Manage the background server daemon.
+
+  Extensions:
+    Firefox         https://addons.mozilla.org/fr/firefox/addon/grabr-integration/  ✓
+    Chrome          — (coming soon)
+    Edge            — (coming soon)
 
   Run grabr without arguments to open the interactive full-screen dashboard.
   `);
@@ -129,6 +135,9 @@ async function main() {
       break;
     case 'daemon':
       await daemonCommand(args.slice(1));
+      break;
+    case 'extensions':
+      await extensionsCommand();
       break;
     default:
       console.error(`Unknown command: ${command}`);

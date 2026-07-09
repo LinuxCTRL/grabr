@@ -218,6 +218,9 @@
           <button id="btn-close-add" class="btn btn-secondary">Cancel</button>
           <button id="btn-submit-download" class="btn">Start Download</button>
         </div>
+      </div>
+    </div>
+
     <!-- Extension Modal Overlay -->
     <div id="extension-modal-overlay" class="modal-overlay">
       <div class="modal" style="max-width: 580px;">
@@ -225,21 +228,22 @@
         
         <div class="form-group" style="font-size: 0.85rem; line-height: 1.5; display: flex; flex-direction: column; gap: 12px; color: var(--text); overflow-y: auto; max-height: 70vh; padding-right: 4px;">
           <p>You can automatically capture browser downloads and right-click links to send them to this Grabr interface!</p>
-          
-          <div style="background-color: var(--surface-lift); border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px;">
-            <strong style="color: var(--accent);">Step 1: Enable Developer Mode</strong>
-            <span style="font-size: 0.8rem;">
-              • <strong>Google Chrome:</strong> Open <code>chrome://extensions</code> and enable <strong>Developer mode</strong> (top-right).<br>
-              • <strong>Microsoft Edge:</strong> Open <code>edge://extensions</code> and enable <strong>Developer mode</strong> (bottom-left).<br>
-              • <strong>Mozilla Firefox:</strong> Open <code>about:debugging#/runtime/this-firefox</code>.
-            </span>
+
+          <div style="background-color: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); padding: 14px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 6px;">
+            <strong style="color: #22c55e;">Firefox — Available on Mozilla Add-ons</strong>
+            <a href="https://addons.mozilla.org/fr/firefox/addon/grabr-integration/" target="_blank" rel="noopener noreferrer" style="color: var(--accent); font-size: 0.8rem;">https://addons.mozilla.org/fr/firefox/addon/grabr-integration/</a>
           </div>
 
+          <div style="background-color: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3); padding: 14px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 6px;">
+            <strong style="color: var(--accent);">Chrome / Edge — Coming Soon</strong>
+            <span style="font-size: 0.8rem; color: var(--muted);">Store listings are in progress. Install manually for now:</span>
+          </div>
+          
           <div style="background-color: var(--surface-lift); border: 1px solid var(--border); padding: 12px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px;">
-            <strong style="color: var(--accent);">Step 2: Load the Extension</strong>
+            <strong style="color: var(--accent);">Manual Install (Development)</strong>
             <span style="font-size: 0.8rem; margin-bottom: 4px;">
-              • <strong>Chrome / Edge:</strong> Click <strong>Load unpacked</strong> and select the directory below.<br>
-              • <strong>Firefox:</strong> Click <strong>Load Temporary Add-on...</strong> and select the <code>manifest.json</code> inside the firefox folder.
+              • <strong>Chrome / Edge:</strong> Open <code>chrome://extensions</code> or <code>edge://extensions</code>, enable <strong>Developer mode</strong>, click <strong>Load unpacked</strong> and select the folder below.<br>
+              • <strong>Firefox:</strong> Open <code>about:debugging#/runtime/this-firefox</code>, click <strong>Load Temporary Add-on...</strong> and select <code>manifest.json</code>.
             </span>
             
             <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -262,7 +266,6 @@
         </div>
       </div>
     </div>
-  </div>
 
   <script src="main.js"></script>
 </body>

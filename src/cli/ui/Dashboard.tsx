@@ -58,7 +58,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
   const { exit } = useApp();
 
   // Dialog & Add Job Form State
-  const [activeDialog, setActiveDialog] = useState<null | 'add-job' | 'delete-confirm'>(null);
+  const [activeDialog, setActiveDialog] = useState<null | 'add-job' | 'delete-confirm' | 'extensions'>(null);
   const [focusedField, setFocusedField] = useState<number>(0);
   const [inputUrl, setInputUrl] = useState('');
   const [inputFilename, setInputFilename] = useState('');
@@ -491,6 +491,16 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
     }
 
     // -----------------------------------------------------------
+    // DIALOG: EXTENSIONS TABLE
+    // -----------------------------------------------------------
+    if (activeDialog === 'extensions') {
+      if (input === 'e' || key.escape) {
+        setActiveDialog(null);
+      }
+      return;
+    }
+
+    // -----------------------------------------------------------
     // DIALOG: DELETE CONFIRMATION
     // -----------------------------------------------------------
     if (activeDialog === 'delete-confirm') {
@@ -522,6 +532,11 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
     // -----------------------------------------------------------
     if (input === 'q') {
       exit();
+      return;
+    }
+
+    if (input === 'e') {
+      setActiveDialog('extensions');
       return;
     }
 
@@ -744,6 +759,35 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
             <Text color="gray">[Enter] submit | [Esc] cancel</Text>
           </Box>
         </Box>
+      ) : activeDialog === 'extensions' ? (
+        // Extensions Table View
+        <Box borderStyle="round" borderColor="cyan" padding={1} flexDirection="column" flexGrow={1}>
+          <Box marginBottom={1}>
+            <Text color="cyan" bold>🧩 GRABR BROWSER EXTENSIONS</Text>
+          </Box>
+          <Box flexDirection="column" paddingX={2} paddingY={1}>
+            <Box flexDirection="row" gap={4} marginBottom={1}>
+              <Text color="gray" bold>Browser</Text>
+              <Text color="gray" bold>Store Link / Status</Text>
+            </Box>
+            <Box flexDirection="row" gap={4} marginBottom={1}>
+              <Text color="green" bold>Firefox</Text>
+              <Text color="white">https://addons.mozilla.org/fr/firefox/addon/grabr-integration/</Text>
+              <Text color="green">✓</Text>
+            </Box>
+            <Box flexDirection="row" gap={4} marginBottom={1}>
+              <Text color="yellow" bold>Chrome</Text>
+              <Text color="gray">— (coming soon)</Text>
+            </Box>
+            <Box flexDirection="row" gap={4} marginBottom={1}>
+              <Text color="yellow" bold>Edge</Text>
+              <Text color="gray">— (coming soon)</Text>
+            </Box>
+          </Box>
+          <Box marginTop={1}>
+            <Text color="gray">[e] or [Esc] close</Text>
+          </Box>
+        </Box>
       ) : activeDialog === 'delete-confirm' && confirmJobId ? (
         // Delete Confirm View
         <Box borderStyle="round" borderColor="red" padding={1} flexDirection="column" flexGrow={1} alignItems="center" justifyContent="center">
@@ -867,7 +911,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
       {/* 5. Footer Shortcut Legend */}
       <Box borderStyle="double" borderColor="gray" paddingX={1} marginTop={1} flexDirection="row" justifyContent="space-between">
         <Text color="gray">
-          <Text color="cyan" bold>q</Text> quit | <Text color="cyan" bold>a</Text> add job | <Text color="cyan" bold>p</Text> pause | <Text color="cyan" bold>r</Text> resume | <Text color="cyan" bold>x</Text> delete | <Text color="cyan" bold>c</Text> clear completed | <Text color="cyan" bold>Enter</Text> open folder | <Text color="cyan" bold>o</Text> web ui | <Text color="cyan" bold>↑↓</Text> navigate
+          <Text color="cyan" bold>q</Text> quit | <Text color="cyan" bold>e</Text> extensions | <Text color="cyan" bold>a</Text> add job | <Text color="cyan" bold>p</Text> pause | <Text color="cyan" bold>r</Text> resume | <Text color="cyan" bold>x</Text> delete | <Text color="cyan" bold>c</Text> clear completed | <Text color="cyan" bold>Enter</Text> open folder | <Text color="cyan" bold>o</Text> web ui | <Text color="cyan" bold>↑↓</Text> navigate
         </Text>
         <Text color="gray">
           Total: {jobs.length} jobs

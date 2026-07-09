@@ -22,7 +22,7 @@ grabr is a local-first download manager featuring chunked parallel downloading, 
 * **Unified Database Sync:** The CLI, Bun/Hono daemon, and web UI all read/write to the same SQLite database file (`~/.grabr/grabr.db`), keeping downloads instantly synced.
 * **YouTube Format Selector:** Intercepts YouTube links in browser extensions, Web UI, and the CLI to present a format selector for combined video resolutions (4K, 1080p, 720p, etc.) or audio-only downloads.
 * **Interactive CLI Dashboard:** Responsive split-pane TUI dashboard with live chunk visualizer, inline job addition form, delete confirmation prompts, and shortcuts to open target save directories.
-* **Browser Integration:** Route browser downloads directly to the Grabr daemon using custom extensions for Chrome, Edge, and Firefox.
+* **Browser Integration:** Route browser downloads directly to the Grabr daemon using official extensions for Chrome, Edge, and Firefox. [Firefox add-on now available on Mozilla Add-ons](https://addons.mozilla.org/fr/firefox/addon/grabr-integration/).
 * **Version Checking:** Automatically alerts you in both the CLI dashboard and Web UI when a newer release of Grabr is available on NPM.
 
 **Works with:** Node.js ≥18, Bun ≥1.0
@@ -78,7 +78,13 @@ Run `grabr` without arguments to open the interactive full-screen TUI dashboard.
 
 ## Browser Integration (Chrome, Edge & Firefox Extensions)
 
-Grabr comes with custom browser extensions to capture downloads and route them directly to the Grabr daemon.
+Grabr comes with browser extensions to capture downloads and route them directly to the Grabr daemon.
+
+| Browser | Store Status |
+| :------ | :----------- |
+| **Firefox** | ✅ [Available on Mozilla Add-ons](https://addons.mozilla.org/fr/firefox/addon/grabr-integration/) |
+| **Google Chrome** | 🔜 Coming soon — install manually for now |
+| **Microsoft Edge** | 🔜 Coming soon — install manually for now |
 
 ### Features:
 * **Automatic Interception:** Captures browser clicks on files matching specific extensions (like `.zip`, `.tar.gz`, `.dmg`, `.iso`, `.exe`) or files exceeding custom size thresholds.
@@ -86,7 +92,7 @@ Grabr comes with custom browser extensions to capture downloads and route them d
 * **Batch Downloader:** Highlight text containing multiple URLs, right-click, and select **"Download links in selection with Grabr"** to queue them in parallel.
 * **Real-time Toolbar Popup:** Includes a live WebSocket progress dashboard, dynamic active badge count, and action controls (Pause/Resume/Delete) right from your toolbar.
 
-### Setup:
+### Setup (Manual / Development):
 
 #### For Google Chrome:
 1. Open Google Chrome and navigate to `chrome://extensions`.
@@ -99,9 +105,8 @@ Grabr comes with custom browser extensions to capture downloads and route them d
 3. Click **Load unpacked** and select the `/extension/edge` directory inside this repository.
 
 #### For Mozilla Firefox:
-1. Open Mozilla Firefox and navigate to `about:debugging#/runtime/this-firefox`.
-2. Click **Load Temporary Add-on...** on the right side.
-3. Select the `manifest.json` file inside the `/extension/firefox` directory in this repository.
+1. Install directly from [Mozilla Add-ons](https://addons.mozilla.org/fr/firefox/addon/grabr-integration/).
+2. Or for development: open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on...**, and select `manifest.json` from `/extension/firefox`.
 
 ---
 
