@@ -9,8 +9,11 @@ import { downloadChunk } from './worker';
 import { mergeChunks } from './merger';
 import { saveResumeState, deleteResumeState, loadResumeState } from './resume';
 import { createJob, updateJob, getJob, listJobs, deleteJob } from '../store/jobs';
+import { updateTorrentJob, listTorrentJobs } from '../store/torrents';
 import { loadConfig, type GrabrConfig } from './config';
 import { isYouTubeUrl, getYouTubeMetadata } from './youtube';
+import { TorrentDownloader, isTorrentInput } from './torrent-downloader';
+import type { TorrentJob } from './types-torrent';
 import type { DownloadJob, ChunkInfo, JobStatus, DownloadOptions } from './types';
 
 export class SpeedMeter {
@@ -73,12 +76,31 @@ export class Downloader extends EventEmitter {
       speedMeter: SpeedMeter;
     }
   >();
+  private torrentDownloader: TorrentDownloader;
   private config: GrabrConfig;
   private intervalTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     super();
     this.config = loadConfig();
+    this.torrentDownloader = new TorrentDownloader();
+
+    // Relay torrent events through the main Downloader
+    this.torrentDownloader.on('torrent:progress', (data) => {
+      this.emit('torrent:progress', data);
+    });
+    this.torrentDownloader.on('torrent:done', (data) => {
+      this.emit('torrent:done', data);
+    });
+    this.torrentDownloader.on('torrent:error', (data) => {
+      this.emit('torrent:error', data);
+    });
+    this.torrentDownloader.on('torrent:status', (data) => {
+      this.emit('torrent:status', data);
+    });
+    this.torrentDownloader.on('torrent:removed', (data) => {
+      this.emit('torrent:removed', data);
+    });
   }
 
   private async resetInterruptedJobs() {
@@ -97,10 +119,26 @@ export class Downloader extends EventEmitter {
     }
   }
 
+  private async resetInterruptedTorrents() {
+    try {
+      const jobs = await listTorrentJobs();
+      for (const job of jobs) {
+        if (job.status === 'downloading') {
+          job.status = 'paused';
+          await updateTorrentJob({ id: job.id, status: 'paused' });
+        }
+      }
+    } catch (_err) {
+      // Ignore
+    }
+  }
+
   public async start() {
     if (this.intervalTimer) return;
 
     await this.resetInterruptedJobs();
+    await this.resetInterruptedTorrents();
+    await this.torrentDownloader.loadPersistedJobs();
 
     // Start background stats updater running every 500ms
     this.intervalTimer = setInterval(() => {
@@ -123,6 +161,7 @@ export class Downloader extends EventEmitter {
       }
       this.activeJobs.delete(jobId);
     }
+    this.torrentDownloader.stop();
   }
 
   private async updateStats() {
@@ -154,10 +193,21 @@ export class Downloader extends EventEmitter {
     }
   }
 
-  public async addJob(url: string, options?: DownloadOptions): Promise<DownloadJob> {
+  public async addJob(url: string, options?: DownloadOptions): Promise<DownloadJob | TorrentJob> {
     const outputDir = options?.outputDir || this.config.outputDir;
 
     mkdirSync(outputDir, { recursive: true });
+
+    // Route torrent inputs to the torrent downloader
+    if (isTorrentInput(url)) {
+      try {
+        const torrentJob = await this.torrentDownloader.add(url, outputDir);
+        this.emit('job:added', torrentJob);
+        return torrentJob;
+      } catch (err: any) {
+        throw new Error(`Torrent error: ${err.message}`);
+      }
+    }
 
     const numChunks = options?.chunks || this.config.defaultChunks;
     
@@ -216,6 +266,13 @@ export class Downloader extends EventEmitter {
       this.activeJobs.delete(jobId);
     }
 
+    // Check if it's a torrent job
+    const torrentJob = this.torrentDownloader.getJob(jobId);
+    if (torrentJob) {
+      this.torrentDownloader.pause(jobId);
+      return;
+    }
+
     const job = await getJob(jobId);
     if (job && (job.status === 'downloading' || job.status === 'queued')) {
       job.status = 'paused';
@@ -231,6 +288,13 @@ export class Downloader extends EventEmitter {
   }
 
   public async resumeJob(jobId: string) {
+    // Check if it's a torrent job
+    const torrentJob = this.torrentDownloader.getJob(jobId);
+    if (torrentJob) {
+      this.torrentDownloader.resume(jobId);
+      return;
+    }
+
     const job = await getJob(jobId);
     if (job && (job.status === 'paused' || job.status === 'failed')) {
       job.status = 'queued';
@@ -247,6 +311,12 @@ export class Downloader extends EventEmitter {
   }
 
   public async removeJob(jobId: string) {
+    const torrentJob = this.torrentDownloader.getJob(jobId);
+    if (torrentJob) {
+      this.torrentDownloader.remove(jobId);
+      return;
+    }
+
     await this.pauseJob(jobId);
     await deleteJob(jobId);
     deleteResumeState(jobId);
@@ -269,6 +339,18 @@ export class Downloader extends EventEmitter {
         await this.resumeJob(job.id);
       }
     }
+  }
+
+  public listTorrentJobs(): TorrentJob[] {
+    return this.torrentDownloader.listJobs();
+  }
+
+  public async selectTorrentFiles(jobId: string, indices: number[], selected: boolean): Promise<void> {
+    await this.torrentDownloader.selectFiles(jobId, indices, selected);
+  }
+
+  public getTorrentFileStream(jobId: string, fileIndex: number, range?: { start?: number; end?: number }): NodeJS.ReadableStream | null {
+    return this.torrentDownloader.getFileStream(jobId, fileIndex, range);
   }
 
   private async processQueue() {

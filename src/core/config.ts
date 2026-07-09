@@ -2,12 +2,23 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir, platform } from 'node:os';
 
+export interface TorrentConfig {
+  downloadDir: string;
+  maxPeers: number;
+  seedRatio: number;
+  seedTime: number;
+  dhtEnabled: boolean;
+  sequentialDownload: boolean;
+  trackers: string[];
+}
+
 export interface GrabrConfig {
   outputDir: string;
   maxConcurrent: number;
   defaultChunks: number;
   serverPort: number;
   theme: string;
+  torrent: TorrentConfig;
 }
 
 const configDir = join(homedir(), '.grabr');
@@ -76,6 +87,15 @@ const defaultConfig: GrabrConfig = {
   defaultChunks: 4,
   serverPort: 7474,
   theme: 'dark',
+  torrent: {
+    downloadDir: join(homedir(), '.grabr', 'torrents'),
+    maxPeers: 100,
+    seedRatio: 0,
+    seedTime: 0,
+    dhtEnabled: true,
+    sequentialDownload: false,
+    trackers: [],
+  },
 };
 
 export function loadConfig(): GrabrConfig {
@@ -118,21 +138,35 @@ export function loadConfig(): GrabrConfig {
       outputDir = join(homedir(), outputDir.slice(2));
     }
 
+    const torrentParsed = parsed.torrent || {};
     return {
       outputDir,
       maxConcurrent: parsed.maxConcurrent ?? defaultConfig.maxConcurrent,
       defaultChunks: parsed.defaultChunks ?? defaultConfig.defaultChunks,
       serverPort: parsed.serverPort ?? defaultConfig.serverPort,
       theme: parsed.theme ?? defaultConfig.theme,
+      torrent: {
+        downloadDir: torrentParsed.downloadDir ?? defaultConfig.torrent.downloadDir,
+        maxPeers: torrentParsed.maxPeers ?? defaultConfig.torrent.maxPeers,
+        seedRatio: torrentParsed.seedRatio ?? defaultConfig.torrent.seedRatio,
+        seedTime: torrentParsed.seedTime ?? defaultConfig.torrent.seedTime,
+        dhtEnabled: torrentParsed.dhtEnabled ?? defaultConfig.torrent.dhtEnabled,
+        sequentialDownload: torrentParsed.sequentialDownload ?? defaultConfig.torrent.sequentialDownload,
+        trackers: torrentParsed.trackers ?? defaultConfig.torrent.trackers,
+      },
     };
   } catch (err) {
     return defaultConfig;
   }
 }
 
-export function saveConfig(config: Partial<GrabrConfig>): void {
+export function saveConfig(config: Partial<GrabrConfig> & { torrent?: Partial<TorrentConfig> }): void {
   const current = loadConfig();
-  const updated = { ...current, ...config };
+  const updated = {
+    ...current,
+    ...config,
+    torrent: { ...current.torrent, ...(config.torrent || {}) },
+  };
   try {
     if (!existsSync(configDir)) {
       mkdirSync(configDir, { recursive: true });

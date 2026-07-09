@@ -10,6 +10,8 @@ import { clearCommand } from './commands/clear';
 import { uiCommand } from './commands/ui';
 import { daemonCommand } from './commands/daemon';
 import { extensionsCommand } from './commands/extensions';
+import { torrentCommand } from './commands/torrent';
+import { configCommand } from './commands/config';
 import { Dashboard } from './ui/Dashboard';
 import { Downloader } from '../core/downloader';
 import { loadConfig } from '../core/config';
@@ -47,6 +49,17 @@ function showHelp() {
     ui              Open the Web UI in your default browser.
     daemon [start|stop|status]
                     Manage the background server daemon.
+    config [list|set <key> <value>]
+                    View and update configuration.
+    torrent <action> <id>
+                    Torrent-specific actions:
+                      add <url|magnet>   Add a torrent by URL or magnet link
+                      list               List all torrent jobs
+                      files <id>         List files inside a torrent
+                      select <id> <i...>  Select files to download
+                      deselect <id> <i...> Deselect files to skip
+                      info <id>          Show detailed torrent info
+                      seed <id> <ratio>  Set seed ratio target
 
   Extensions:
     Firefox         https://addons.mozilla.org/fr/firefox/addon/grabr-integration/  ✓
@@ -138,6 +151,12 @@ async function main() {
       break;
     case 'extensions':
       await extensionsCommand();
+      break;
+    case 'config':
+      await configCommand(args.slice(1));
+      break;
+    case 'torrent':
+      await torrentCommand(args.slice(1));
       break;
     default:
       console.error(`Unknown command: ${command}`);

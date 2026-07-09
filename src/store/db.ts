@@ -54,6 +54,31 @@ async function init(): Promise<void> {
       )
     `);
 
+    // Migration: add type column to jobs if missing
+    const cols = db.exec("PRAGMA table_info('jobs')");
+    const hasType = cols[0]?.values?.some((row: any) => row[1] === 'type');
+    if (!hasType) {
+      db.run("ALTER TABLE jobs ADD COLUMN type TEXT DEFAULT 'http'");
+    }
+
+    db.run(`
+      CREATE TABLE IF NOT EXISTS torrents (
+        job_id TEXT PRIMARY KEY,
+        input TEXT NOT NULL,
+        info_hash TEXT NOT NULL,
+        name TEXT NOT NULL,
+        files TEXT NOT NULL DEFAULT '[]',
+        total_length INTEGER DEFAULT 0,
+        downloaded INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'downloading',
+        seed_ratio REAL DEFAULT 0,
+        seed_time INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        error TEXT
+      )
+    `);
+
     persistDb();
   })();
 

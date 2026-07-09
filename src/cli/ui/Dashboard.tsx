@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text, useInput, useApp } from 'ink';
 import type { DownloadJob } from '../../core/types';
+import type { TorrentJob } from '../../core/types-torrent';
 import { JobRow } from './JobRow';
 import { listJobs } from '../../store/jobs';
 import type { Downloader } from '../../core/downloader';
@@ -58,12 +59,18 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
   const { exit } = useApp();
 
   // Dialog & Add Job Form State
-  const [activeDialog, setActiveDialog] = useState<null | 'add-job' | 'delete-confirm' | 'extensions'>(null);
+  const [activeDialog, setActiveDialog] = useState<null | 'add-job' | 'delete-confirm' | 'extensions' | 'add-torrent'>(null);
   const [focusedField, setFocusedField] = useState<number>(0);
   const [inputUrl, setInputUrl] = useState('');
   const [inputFilename, setInputFilename] = useState('');
   const [inputOutDir, setInputOutDir] = useState('');
   const [confirmJobId, setConfirmJobId] = useState<string | null>(null);
+
+  // Torrent dialog state
+  const [torrentUrl, setTorrentUrl] = useState('');
+  const [torrentJob, setTorrentJob] = useState<any>(null);
+  const [torrentFocusedIdx, setTorrentFocusedIdx] = useState(0);
+  const [torrentStatus, setTorrentStatus] = useState('');
 
   // YouTube formats state
   const [ytFormats, setYtFormats] = useState<{ value: string; label: string; ext: string }[]>([]);
@@ -491,6 +498,137 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
     }
 
     // -----------------------------------------------------------
+    // DIALOG: ADD TORRENT
+    // -----------------------------------------------------------
+    if (activeDialog === 'add-torrent') {
+      if (key.escape) {
+        setActiveDialog(null);
+        setTorrentUrl('');
+        setTorrentJob(null);
+        setTorrentStatus('');
+        return;
+      }
+
+      if (!torrentJob) {
+        // Phase 1: URL input
+        if (key.return) {
+          if (torrentUrl.trim()) {
+            setTorrentStatus('Adding torrent...');
+            (async () => {
+              try {
+                let job: any;
+                if (mode === 'local' && downloader) {
+                  job = await downloader.addJob(torrentUrl.trim());
+                } else {
+                  const res = await fetch(`${apiBase}/jobs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: torrentUrl.trim() }),
+                  });
+                  if (!res.ok) throw new Error(await res.text());
+                  job = await res.json();
+                }
+                setTorrentJob(job);
+                setTorrentFocusedIdx(0);
+                setTorrentStatus('');
+              } catch (err: any) {
+                setTorrentStatus(`Error: ${err.message}`);
+              }
+            })();
+          } else {
+            setTorrentStatus('Please enter a URL or magnet link');
+          }
+          return;
+        }
+
+        if (key.backspace || key.delete) {
+          setTorrentUrl((p) => p.slice(0, -1));
+          return;
+        }
+
+        const cleanInput = input
+          .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+          .replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+        if (cleanInput.length > 0) {
+          setTorrentUrl((p) => p + cleanInput);
+          return;
+        }
+      } else {
+        // Phase 2: File selection
+        const files = torrentJob.files || [];
+        if (files.length === 0) {
+          // No files to select, just close
+          setActiveDialog(null);
+          setTorrentUrl('');
+          setTorrentJob(null);
+          setTorrentStatus('');
+          return;
+        }
+
+        if (key.upArrow) {
+          setTorrentFocusedIdx((prev) => Math.max(0, prev - 1));
+          return;
+        }
+        if (key.downArrow) {
+          setTorrentFocusedIdx((prev) => Math.min(files.length - 1, prev + 1));
+          return;
+        }
+        if (input === ' ') {
+          // Toggle current file's checkbox via API
+          const idx = torrentFocusedIdx;
+          const currentFile = files[idx];
+          if (currentFile) {
+            const newSelected = !currentFile.selected;
+            // Optimistic update
+            const updatedFiles = [...files];
+            updatedFiles[idx] = { ...currentFile, selected: newSelected };
+            setTorrentJob({ ...torrentJob, files: updatedFiles });
+            // Send to daemon
+            try {
+              const jobId = torrentJob.id;
+              await fetch(`${apiBase}/torrents/${jobId}/select`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ indices: [idx], selected: newSelected }),
+              });
+            } catch {
+              // Ignore
+            }
+          }
+          return;
+        }
+        if (input === 'a') {
+          // Toggle all
+          const allSelected = files.every((f: any) => f.selected);
+          const updatedFiles = files.map((f: any) => ({ ...f, selected: !allSelected }));
+          setTorrentJob({ ...torrentJob, files: updatedFiles });
+          try {
+            const jobId = torrentJob.id;
+            const indices = files.map((_: any, i: number) => i);
+            await fetch(`${apiBase}/torrents/${jobId}/select`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ indices, selected: !allSelected }),
+            });
+          } catch {
+            // Ignore
+          }
+          return;
+        }
+        if (key.return) {
+          // Confirm and close
+          setActiveDialog(null);
+          setTorrentUrl('');
+          setTorrentJob(null);
+          setTorrentStatus('');
+          setStatusMessage('Torrent added with selected files.');
+          return;
+        }
+      }
+      return;
+    }
+
+    // -----------------------------------------------------------
     // DIALOG: EXTENSIONS TABLE
     // -----------------------------------------------------------
     if (activeDialog === 'extensions') {
@@ -543,6 +681,14 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
     if (input === 'a') {
       setActiveDialog('add-job');
       setFocusedField(0);
+      return;
+    }
+
+    if (input === 't') {
+      setActiveDialog('add-torrent');
+      setTorrentUrl('');
+      setTorrentJob(null);
+      setTorrentStatus('');
       return;
     }
 
@@ -759,6 +905,59 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
             <Text color="gray">[Enter] submit | [Esc] cancel</Text>
           </Box>
         </Box>
+      ) : activeDialog === 'add-torrent' ? (
+        <Box borderStyle="round" borderColor="green" padding={1} flexDirection="column" flexGrow={1}>
+          {!torrentJob ? (
+            // Phase 1: URL input
+            <Box flexDirection="column">
+              <Box marginBottom={1}>
+                <Text color="green" bold>🧲 ADD TORRENT</Text>
+              </Box>
+              <Box flexDirection="row" marginBottom={1}>
+                <Text color="gray" bold>  Magnet URL or torrent file:{' '}</Text>
+              </Box>
+              <Box borderStyle="single" borderColor="green" paddingX={1}>
+                <Text color="white">{torrentUrl || ''}</Text>
+                <Text color="green" bold>█</Text>
+              </Box>
+              {torrentStatus ? (
+                <Box marginTop={1}>
+                  <Text color={torrentStatus.startsWith('Error') ? 'red' : 'yellow'}>{torrentStatus === 'Adding torrent...' ? '⏳ ' : '✗ '}{torrentStatus}</Text>
+                </Box>
+              ) : null}
+              <Box marginTop={1} flexDirection="row" justifyContent="space-between">
+                <Text color="gray">Type URL or magnet link</Text>
+                <Text color="gray">[Enter] submit | [Esc] cancel</Text>
+              </Box>
+            </Box>
+          ) : (
+            // Phase 2: File selection
+            <Box flexDirection="column">
+              <Box marginBottom={1}>
+                <Text color="green" bold>📁 FILES: {torrentJob.name || torrentJob.id}</Text>
+              </Box>
+              <Box flexDirection="column" marginBottom={1}>
+                {(torrentJob.files || []).map((f: any, i: number) => {
+                  const isFocused = i === torrentFocusedIdx;
+                  const mark = f.selected ? '✓' : '✗';
+                  return (
+                    <Box key={i} flexDirection="row">
+                      <Text color={isFocused ? 'green' : 'gray'}>{isFocused ? '▶ ' : '  '}</Text>
+                      <Text color={f.selected ? 'green' : 'red'} bold>{mark} </Text>
+                      <Text color={isFocused ? 'white' : 'gray'} wrap="truncate-end">
+                        {formatBytes(f.length).padStart(9)}  {f.path}
+                      </Text>
+                    </Box>
+                  );
+                })}
+              </Box>
+              <Box flexDirection="row" justifyContent="space-between">
+                <Text color="gray">[↑↓] navigate | [Space] toggle file | [a] toggle all</Text>
+                <Text color="gray">[Enter] confirm | [Esc] cancel</Text>
+              </Box>
+            </Box>
+          )}
+        </Box>
       ) : activeDialog === 'extensions' ? (
         // Extensions Table View
         <Box borderStyle="round" borderColor="cyan" padding={1} flexDirection="column" flexGrow={1}>
@@ -911,7 +1110,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
       {/* 5. Footer Shortcut Legend */}
       <Box borderStyle="double" borderColor="gray" paddingX={1} marginTop={1} flexDirection="row" justifyContent="space-between">
         <Text color="gray">
-          <Text color="cyan" bold>q</Text> quit | <Text color="cyan" bold>e</Text> extensions | <Text color="cyan" bold>a</Text> add job | <Text color="cyan" bold>p</Text> pause | <Text color="cyan" bold>r</Text> resume | <Text color="cyan" bold>x</Text> delete | <Text color="cyan" bold>c</Text> clear completed | <Text color="cyan" bold>Enter</Text> open folder | <Text color="cyan" bold>o</Text> web ui | <Text color="cyan" bold>↑↓</Text> navigate
+          <Text color="cyan" bold>q</Text> quit | <Text color="cyan" bold>e</Text> extensions | <Text color="cyan" bold>a</Text> add url | <Text color="cyan" bold>t</Text> add torrent | <Text color="cyan" bold>p</Text> pause | <Text color="cyan" bold>r</Text> resume | <Text color="cyan" bold>x</Text> delete | <Text color="cyan" bold>c</Text> clear completed | <Text color="cyan" bold>Enter</Text> open folder | <Text color="cyan" bold>o</Text> web ui | <Text color="cyan" bold>↑↓</Text> navigate
         </Text>
         <Text color="gray">
           Total: {jobs.length} jobs

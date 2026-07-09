@@ -164,6 +164,28 @@
                 </div>
               </div>
 
+              <!-- Torrent Info (hidden for HTTP jobs) -->
+              <div id="detail-torrent-info" class="detail-section" style="display: none;">
+                <span class="detail-section-title">Torrent Info</span>
+                <div class="detail-info-grid" style="margin-top: 0.5rem;">
+                  <div class="detail-info-row">
+                    <span class="detail-info-label">Info Hash:</span>
+                    <span id="detail-info-hash" class="detail-info-value-mono" style="font-size: 0.7rem;">--</span>
+                  </div>
+                  <div class="detail-info-row">
+                    <span class="detail-info-label">Peers:</span>
+                    <span id="detail-peers" class="detail-info-value-mono">0</span>
+                  </div>
+                  <div class="detail-info-row">
+                    <span class="detail-info-label">Seed Ratio:</span>
+                    <span id="detail-seed-ratio" class="detail-info-value-mono">0</span>
+                  </div>
+                </div>
+                <div id="detail-torrent-files" class="torrent-files-list" style="margin-top: 0.5rem; max-height: 200px; overflow-y: auto;">
+                  <!-- Torrent files will be listed here -->
+                </div>
+              </div>
+
               <div class="detail-section">
                 <span class="detail-section-title" id="detail-chunks-title">Parallel Chunks</span>
                 <div id="chunk-grid" class="chunk-grid-blocks">
@@ -179,44 +201,96 @@
 
     <!-- Add Download Modal Overlay -->
     <div id="add-modal-overlay" class="modal-overlay">
-      <div class="modal">
+      <div class="modal" style="max-width: 560px;">
         <h3 class="modal-title">New Download</h3>
-        
-        <div class="form-group">
-          <label class="form-label" for="download-url">File URL</label>
-          <input type="url" id="download-url" class="form-input form-input-mono" placeholder="https://example.com/largefile.zip" required autocomplete="off">
+
+        <!-- Tab Bar -->
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-tab="url">URL Download</button>
+          <button class="modal-tab" data-tab="torrent">Torrent</button>
         </div>
 
-        <div class="form-group" id="yt-quality-group" style="display: none; margin-bottom: 1rem;">
-          <label class="form-label" for="download-quality">YouTube Quality</label>
-          <select id="download-quality" class="form-input">
-            <option value="bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best">Best Quality (1080p+)</option>
-            <option value="bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best">720p HD (MP4)</option>
-            <option value="bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best">480p SD (MP4)</option>
-            <option value="bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best">360p Low (MP4)</option>
-            <option value="bestaudio[ext=m4a]/bestaudio">Audio Only (M4A)</option>
-          </select>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <!-- URL Download Tab -->
+        <div id="tab-url" class="tab-content">
           <div class="form-group">
-            <label class="form-label" for="download-chunks">Parallel Chunks</label>
-            <input type="number" id="download-chunks" class="form-input" min="1" max="16" value="4">
+            <label class="form-label" for="download-url">File URL</label>
+            <input type="text" id="download-url" class="form-input form-input-mono" placeholder="https://example.com/file.zip" required autocomplete="off">
           </div>
+
+          <div class="form-group" id="yt-quality-group" style="display: none; margin-bottom: 1rem;">
+            <label class="form-label" for="download-quality">YouTube Quality</label>
+            <select id="download-quality" class="form-input">
+              <option value="bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best">Best Quality (1080p+)</option>
+              <option value="bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best">720p HD (MP4)</option>
+              <option value="bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/best">480p SD (MP4)</option>
+              <option value="bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best">360p Low (MP4)</option>
+              <option value="bestaudio[ext=m4a]/bestaudio">Audio Only (M4A)</option>
+            </select>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label class="form-label" for="download-chunks">Parallel Chunks</label>
+              <input type="number" id="download-chunks" class="form-input" min="1" max="16" value="4">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="download-name">Filename (Optional)</label>
+              <input type="text" id="download-name" class="form-input" placeholder="Custom filename">
+            </div>
+          </div>
+
           <div class="form-group">
-            <label class="form-label" for="download-name">Filename (Optional)</label>
-            <input type="text" id="download-name" class="form-input" placeholder="Custom filename">
+            <label class="form-label" for="download-output">Save Directory (Optional)</label>
+            <input type="text" id="download-output" class="form-input" placeholder="Defaults to config folder">
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label" for="download-output">Save Directory (Optional)</label>
-          <input type="text" id="download-output" class="form-input" placeholder="Defaults to config folder">
+        <!-- Torrent Tab -->
+        <div id="tab-torrent" class="tab-content" style="display: none;">
+          <div class="form-group">
+            <label class="form-label" for="torrent-url">Magnet Link or Torrent URL</label>
+            <input type="text" id="torrent-url" class="form-input form-input-mono" placeholder="magnet:?... or https://example.com/file.torrent" autocomplete="off">
+          </div>
+
+          <div class="torrent-or-divider"><span>or</span></div>
+
+          <div class="form-group">
+            <label class="form-label">Upload .torrent File</label>
+            <div id="torrent-drop-zone" class="torrent-drop-zone">
+              <div class="torrent-drop-content">
+                <span class="torrent-drop-icon">📁</span>
+                <span class="torrent-drop-text">Drop a .torrent file here or click to browse</span>
+                <input type="file" id="torrent-file-input" accept=".torrent,application/x-bittorrent" class="torrent-file-input-hidden">
+              </div>
+              <div id="torrent-file-name" class="torrent-file-name" style="display: none;"></div>
+            </div>
+          </div>
+
+          <!-- Torrent file selection (shown after adding) -->
+          <div id="torrent-files-section" style="display: none;">
+            <div class="torrent-modal-header">
+              <span class="torrent-modal-title">Files</span>
+              <label class="torrent-select-all">
+                <input type="checkbox" id="select-all-files" checked>
+                <span>Select all</span>
+              </label>
+            </div>
+            <div id="torrent-file-list-modal" class="torrent-file-list-modal"></div>
+
+            <div class="modal-actions" style="margin-top: 0.5rem;">
+              <button id="btn-cancel-torrent" class="btn btn-secondary">Cancel</button>
+              <button id="btn-start-torrent" class="btn">Start Download</button>
+            </div>
+          </div>
         </div>
 
-        <div class="modal-actions">
+        <div id="tab-url-actions" class="modal-actions">
           <button id="btn-close-add" class="btn btn-secondary">Cancel</button>
           <button id="btn-submit-download" class="btn">Start Download</button>
+        </div>
+        <div id="tab-torrent-actions" class="modal-actions" style="display: none;">
+          <button id="btn-close-add-2" class="btn btn-secondary">Cancel</button>
+          <button id="btn-add-torrent-url" class="btn">Add Torrent</button>
         </div>
       </div>
     </div>

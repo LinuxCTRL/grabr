@@ -91,29 +91,40 @@ function getFileIcon(filename) {
     return "\uD83D\uDDBC️";
   return "⬇️";
 }
+function isTorrentJob(job) {
+  return job.type === "torrent";
+}
 function getJobCardHtml(job, isSelected) {
-  const percent = job.totalBytes > 0 ? job.downloadedBytes / job.totalBytes * 100 : 0;
+  const isTorrent = isTorrentJob(job);
+  const totalBytes = isTorrent ? job.totalLength : job.totalBytes;
+  const downloadedBytes = isTorrent ? job.downloaded : job.downloadedBytes;
+  const filename = isTorrent ? job.name : job.filename;
+  const status = job.status;
+  const percent = totalBytes > 0 ? downloadedBytes / totalBytes * 100 : 0;
   const activeClass = isSelected ? "active" : "";
   let speedText = "--";
   let etaText = "--";
-  if (job.status === "downloading") {
-    speedText = formatSpeed(job.speed);
+  if (status === "downloading") {
+    speedText = isTorrent ? `${formatSpeed(job.speed)} | ${job.peers} peers` : formatSpeed(job.speed);
     etaText = formatETA(job.eta);
-  } else if (job.status === "completed") {
+  } else if (status === "completed") {
     speedText = "Completed";
     etaText = "Done";
-  } else if (job.status === "paused") {
+  } else if (status === "paused") {
     speedText = "Paused";
     etaText = "Resumable";
-  } else if (job.status === "queued") {
+  } else if (status === "queued") {
     speedText = "Queued";
     etaText = "Waiting...";
-  } else if (job.status === "failed") {
+  } else if (status === "failed") {
     speedText = "Failed";
     etaText = "Error";
+  } else if (status === "seeding") {
+    speedText = "Seeding";
+    etaText = "₿";
   }
   let actionButton = "";
-  if (job.status === "downloading" || job.status === "queued") {
+  if (status === "downloading" || status === "queued") {
     actionButton = `
       <button class="btn-action-icon action-btn" data-action="pause" data-id="${job.id}" title="Pause">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -122,7 +133,7 @@ function getJobCardHtml(job, isSelected) {
         </svg>
       </button>
     `;
-  } else if (job.status === "paused" || job.status === "failed") {
+  } else if (status === "paused" || status === "failed" || status === "seeding") {
     actionButton = `
       <button class="btn-action-icon action-btn" data-action="resume" data-id="${job.id}" title="Resume">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -139,19 +150,20 @@ function getJobCardHtml(job, isSelected) {
       </svg>
     </button>
   `;
-  const icon = getFileIcon(job.filename);
-  const sizeText = `${formatBytes(job.downloadedBytes)} of ${job.totalBytes > 0 ? formatBytes(job.totalBytes) : "Unknown"}`;
+  const icon = isTorrent ? "\uD83E\uDDF2" : getFileIcon(filename);
+  const sizeText = `${formatBytes(downloadedBytes)} of ${totalBytes > 0 ? formatBytes(totalBytes) : "Unknown"}`;
+  const badge = isTorrent ? '<span class="torrent-badge">TORRENT</span>' : "";
   return `
     <div class="job-card ${activeClass}" data-id="${job.id}">
       <span style="font-size: 1.5rem; flex-shrink: 0; user-select: none;">${icon}</span>
       
       <div class="job-card-header">
-        <span class="job-title" title="${job.filename}">${job.filename}</span>
-        <span class="job-meta-desc">${sizeText} | ${job.status.toUpperCase()}</span>
+        <span class="job-title" title="${filename}">${filename}${badge}</span>
+        <span class="job-meta-desc">${sizeText} | ${status.toUpperCase()}</span>
       </div>
 
       <div class="progress-ring-container">
-        ${getProgressRingHtml(percent, job.status)}
+        ${getProgressRingHtml(percent, status)}
         <span class="progress-ring-text">${Math.round(percent)}%</span>
       </div>
 
@@ -181,6 +193,18 @@ function updateTopbar(activeCount, totalSpeed) {
 }
 
 // src/web/main.ts
+function isTorrentJob2(job) {
+  return job.type === "torrent";
+}
+function getJobFilename(job) {
+  return isTorrentJob2(job) ? job.name : job.filename;
+}
+function getJobTotalBytes(job) {
+  return isTorrentJob2(job) ? job.totalLength : job.totalBytes;
+}
+function getJobDownloadedBytes(job) {
+  return isTorrentJob2(job) ? job.downloaded : job.downloadedBytes;
+}
 var jobs = [];
 var selectedJobId = null;
 var ws = null;
@@ -208,6 +232,11 @@ var detailChunksTitle = document.getElementById("detail-chunks-title");
 var detailFileName = document.getElementById("detail-file-name");
 var detailFilePath = document.getElementById("detail-file-path");
 var detailFileIcon = document.getElementById("detail-file-icon");
+var detailTorrentInfo = document.getElementById("detail-torrent-info");
+var detailInfoHash = document.getElementById("detail-info-hash");
+var detailPeers = document.getElementById("detail-peers");
+var detailSeedRatio = document.getElementById("detail-seed-ratio");
+var detailTorrentFiles = document.getElementById("detail-torrent-files");
 var inputUrl = document.getElementById("download-url");
 var inputChunks = document.getElementById("download-chunks");
 var inputName = document.getElementById("download-name");
@@ -217,12 +246,11 @@ var downloadQuality = document.getElementById("download-quality");
 async function fetchJobs() {
   try {
     const res = await fetch("/api/jobs");
-    if (res.ok) {
-      jobs = await res.json();
-      renderJobsGrid();
-      updateStats();
-      renderDetailPanel();
-    }
+    const allJobs = res.ok ? await res.json() : [];
+    jobs = allJobs;
+    renderJobsGrid();
+    updateStats();
+    renderDetailPanel();
   } catch (err) {
     console.error("Failed to fetch jobs:", err);
   }
@@ -248,28 +276,27 @@ function connectWebSocket() {
 }
 function handleWebSocketMessage(data) {
   if (data.type === "job:progress") {
-    jobs = jobs.map((job) => job.id === data.jobId ? {
-      ...job,
-      downloadedBytes: data.downloadedBytes,
-      speed: data.speed,
-      eta: data.eta,
-      chunks: data.chunks || job.chunks,
-      updatedAt: Date.now()
-    } : job);
+    jobs = jobs.map((job) => {
+      if (job.id !== data.jobId)
+        return job;
+      if (isTorrentJob2(job)) {
+        Object.assign(job, { downloaded: data.downloadedBytes, speed: data.speed, eta: data.eta, updatedAt: Date.now() });
+      } else {
+        Object.assign(job, { downloadedBytes: data.downloadedBytes, speed: data.speed, eta: data.eta, chunks: data.chunks, updatedAt: Date.now() });
+      }
+      return job;
+    });
     updateJobCardDOM(data.jobId);
     updateStats();
     if (selectedJobId === data.jobId) {
       renderDetailPanel();
     }
   } else if (data.type === "job:status") {
-    jobs = jobs.map((job) => job.id === data.jobId ? {
-      ...job,
-      status: data.status,
-      error: data.error,
-      speed: 0,
-      eta: -1,
-      updatedAt: Date.now()
-    } : job);
+    jobs = jobs.map((job) => {
+      if (job.id !== data.jobId)
+        return job;
+      return Object.assign(job, { status: data.status, error: data.error, speed: 0, eta: -1, updatedAt: Date.now() });
+    });
     refreshJobDetails(data.jobId);
   } else if (data.type === "job:added") {
     if (!jobs.some((job) => job.id === data.job.id)) {
@@ -287,14 +314,79 @@ function handleWebSocketMessage(data) {
     }
   } else if (data.type === "jobs:cleared") {
     fetchJobs();
+  } else if (data.type.startsWith("torrent:")) {
+    handleTorrentWebSocketMessage(data);
+  }
+}
+function handleTorrentWebSocketMessage(data) {
+  if (data.type === "torrent:progress") {
+    jobs = jobs.map((job) => {
+      if (job.id !== data.jobId)
+        return job;
+      return Object.assign(job, {
+        downloaded: data.downloaded,
+        speed: data.speed,
+        eta: data.eta,
+        progress: data.progress,
+        peers: data.peers,
+        updatedAt: Date.now()
+      });
+    });
+    updateJobCardDOM(data.jobId);
+    updateStats();
+    if (selectedJobId === data.jobId) {
+      renderDetailPanel();
+    }
+  } else if (data.type === "torrent:done") {
+    jobs = jobs.map((job) => {
+      if (job.id !== data.jobId)
+        return job;
+      return Object.assign(job, { status: "seeding", progress: 1, speed: 0, updatedAt: Date.now() });
+    });
+    updateJobCardDOM(data.jobId);
+    renderJobsGrid();
+    updateStats();
+    if (selectedJobId === data.jobId) {
+      renderDetailPanel();
+    }
+  } else if (data.type === "torrent:error") {
+    jobs = jobs.map((job) => {
+      if (job.id !== data.jobId)
+        return job;
+      return Object.assign(job, { status: "failed", error: data.error, updatedAt: Date.now() });
+    });
+    refreshJobDetails(data.jobId);
+  } else if (data.type === "torrent:status") {
+    jobs = jobs.map((job) => {
+      if (job.id !== data.jobId)
+        return job;
+      return Object.assign(job, { status: data.status, updatedAt: Date.now() });
+    });
+    updateJobCardDOM(data.jobId);
+    renderJobsGrid();
+    if (selectedJobId === data.jobId) {
+      renderDetailPanel();
+    }
+  } else if (data.type === "torrent:removed") {
+    jobs = jobs.filter((job) => job.id !== data.jobId);
+    renderJobsGrid();
+    updateStats();
+    if (selectedJobId === data.jobId) {
+      selectedJobId = null;
+      renderDetailPanel();
+    }
   }
 }
 async function refreshJobDetails(jobId) {
   try {
-    const res = await fetch(`/api/jobs/${jobId}`);
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job)
+      return;
+    const endpoint = isTorrentJob2(job) ? `/api/torrents/${jobId}` : `/api/jobs/${jobId}`;
+    const res = await fetch(endpoint);
     if (res.ok) {
       const refreshedJob = await res.json();
-      jobs = jobs.map((j) => j.id === jobId ? refreshedJob : j);
+      jobs = jobs.map((j) => j.id === jobId ? { ...j, ...refreshedJob } : j);
       renderJobsGrid();
       updateStats();
       if (selectedJobId === jobId) {
@@ -367,52 +459,102 @@ function renderDetailPanel() {
     selectedJobId = null;
     return;
   }
-  detailTitle.textContent = "Download Details";
-  detailSubtitle.textContent = "Job configuration";
+  const isTorrent = isTorrentJob2(job);
+  const filename = getJobFilename(job);
+  const totalBytes = getJobTotalBytes(job);
+  const downloadedBytes = getJobDownloadedBytes(job);
+  detailTitle.textContent = isTorrent ? "Torrent Details" : "Download Details";
+  detailSubtitle.textContent = isTorrent ? "Torrent job information" : "Job configuration";
   if (detailFileName) {
-    detailFileName.textContent = job.filename;
-    detailFileName.setAttribute("title", job.filename);
+    detailFileName.textContent = filename;
+    detailFileName.setAttribute("title", filename);
   }
   if (detailFilePath) {
-    detailFilePath.textContent = job.destination;
-    detailFilePath.setAttribute("title", job.destination);
+    const dest = isTorrent ? "" : job.destination;
+    detailFilePath.textContent = dest;
+    detailFilePath.setAttribute("title", dest);
   }
   if (detailFileIcon) {
-    detailFileIcon.textContent = getFileIcon(job.filename);
+    detailFileIcon.textContent = isTorrent ? "\uD83E\uDDF2" : getFileIcon(filename);
   }
   if (detailStatusVal) {
     detailStatusVal.textContent = job.status.toUpperCase();
-    detailStatusVal.style.color = job.status === "downloading" ? "var(--accent)" : job.status === "completed" ? "var(--success)" : job.status === "failed" ? "var(--error)" : "var(--muted)";
+    detailStatusVal.style.color = job.status === "downloading" ? "var(--accent)" : job.status === "completed" ? "var(--success)" : job.status === "failed" ? "var(--error)" : job.status === "seeding" ? "#22c55e" : "var(--muted)";
   }
   if (detailSpeedVal) {
     detailSpeedVal.textContent = job.status === "downloading" ? formatSpeed(job.speed) : "--";
   }
   if (detailProgressVal) {
-    detailProgressVal.textContent = `${formatBytes(job.downloadedBytes)} of ${job.totalBytes > 0 ? formatBytes(job.totalBytes) : "Unknown"}`;
+    detailProgressVal.textContent = `${formatBytes(downloadedBytes)} of ${totalBytes > 0 ? formatBytes(totalBytes) : "Unknown"}`;
   }
   if (detailEtaVal) {
     detailEtaVal.textContent = job.status === "downloading" ? formatETA(job.eta) : "--";
   }
-  let chunkHtml = "";
-  if (job.chunks && job.chunks.length > 0) {
-    if (detailChunksTitle) {
-      detailChunksTitle.textContent = `Parallel Chunks (${job.chunks.length} Threads)`;
+  if (isTorrent && detailTorrentInfo) {
+    const t = job;
+    detailChunksTitle.textContent = "Torrent Files";
+    if (detailInfoHash)
+      detailInfoHash.textContent = t.infoHash;
+    if (detailPeers)
+      detailPeers.textContent = String(t.peers ?? 0);
+    if (detailSeedRatio)
+      detailSeedRatio.textContent = String(t.seedRatio ?? 0);
+    detailTorrentInfo.style.display = "block";
+    if (detailTorrentFiles && t.files) {
+      detailTorrentFiles.innerHTML = t.files.map((f, i) => `
+        <div class="torrent-file-row" data-idx="${i}" data-selected="${f.selected}" title="${f.path}">
+          <span class="torrent-file-idx">#${i}</span>
+          <span class="torrent-file-path">${f.path}</span>
+          <span class="torrent-file-size">${formatBytes(f.length)}</span>
+          <span class="torrent-file-status ${f.selected ? "selected" : "deselected"}">${f.selected ? "✓" : "✗"}</span>
+        </div>
+      `).join("");
     }
-    chunkHtml = job.chunks.map((chunk) => {
-      const chunkSize = chunk.end - chunk.start + 1;
-      const percent = chunkSize > 0 ? chunk.downloaded / chunkSize * 100 : 0;
-      const tooltip = `Chunk #${chunk.index + 1}: ${Math.round(percent)}% (${formatBytes(chunk.downloaded)} / ${formatBytes(chunkSize)})`;
-      return `
-          <div class="chunk-block ${chunk.status}" data-chunk-index="${chunk.index}" data-tooltip="${tooltip}"></div>
-        `;
-    }).join("");
+    chunkGrid.innerHTML = "";
   } else {
-    if (detailChunksTitle) {
-      detailChunksTitle.textContent = "Parallel Chunks";
+    if (detailTorrentInfo)
+      detailTorrentInfo.style.display = "none";
+    let chunkHtml = "";
+    const d = job;
+    if (d.chunks && d.chunks.length > 0) {
+      if (detailChunksTitle) {
+        detailChunksTitle.textContent = `Parallel Chunks (${d.chunks.length} Threads)`;
+      }
+      chunkHtml = d.chunks.map((chunk) => {
+        const chunkSize = chunk.end - chunk.start + 1;
+        const percent = chunkSize > 0 ? chunk.downloaded / chunkSize * 100 : 0;
+        const tooltip = `Chunk #${chunk.index + 1}: ${Math.round(percent)}% (${formatBytes(chunk.downloaded)} / ${formatBytes(chunkSize)})`;
+        return `
+            <div class="chunk-block ${chunk.status}" data-chunk-index="${chunk.index}" data-tooltip="${tooltip}"></div>
+          `;
+      }).join("");
+    } else {
+      if (detailChunksTitle) {
+        detailChunksTitle.textContent = "Parallel Chunks";
+      }
+      chunkHtml = `<div style="grid-column: 1/-1; color: var(--muted); text-align: center; font-size: 0.8rem;">Single chunk stream</div>`;
     }
-    chunkHtml = `<div style="grid-column: 1/-1; color: var(--muted); text-align: center; font-size: 0.8rem;">Single chunk stream</div>`;
+    chunkGrid.innerHTML = chunkHtml;
   }
-  chunkGrid.innerHTML = chunkHtml;
+  const torrentFilesContainer = document.getElementById("detail-torrent-files");
+  if (torrentFilesContainer) {
+    torrentFilesContainer.onclick = async (e) => {
+      const row = e.target.closest(".torrent-file-row");
+      if (!row)
+        return;
+      const idx = parseInt(row.getAttribute("data-idx") || "", 10);
+      if (isNaN(idx))
+        return;
+      const isSelected = row.getAttribute("data-selected") === "true";
+      try {
+        await fetch(`/api/torrents/${selectedJobId}/select`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ indices: [idx], selected: !isSelected })
+        });
+      } catch {}
+    };
+  }
   detailPanel.classList.add("visible");
 }
 async function pauseJob(id) {
@@ -448,20 +590,267 @@ async function clearCompleted() {
 function showAddModal() {
   if (addModalOverlay) {
     addModalOverlay.classList.add("visible");
+    hideTorrentFileSelection();
+    modalTabs.forEach((t) => t.classList.remove("active"));
+    const urlTab = document.querySelector('.modal-tab[data-tab="url"]');
+    if (urlTab)
+      urlTab.classList.add("active");
+    if (tabUrl)
+      tabUrl.style.display = "flex";
+    if (tabTorrent)
+      tabTorrent.style.display = "none";
+    if (tabUrlActions)
+      tabUrlActions.style.display = "flex";
+    if (tabTorrentActions)
+      tabTorrentActions.style.display = "none";
     inputUrl.focus();
   }
 }
 function hideAddModal() {
   if (addModalOverlay) {
     addModalOverlay.classList.remove("visible");
+    hideTorrentFileSelection();
     inputUrl.value = "";
     inputName.value = "";
     inputOutput.value = "";
     inputChunks.value = "4";
+    if (torrentUrlInput)
+      torrentUrlInput.value = "";
     if (ytQualityGroup) {
       ytQualityGroup.style.display = "none";
     }
   }
+}
+var addedTorrentJob = null;
+var modalTabs = document.querySelectorAll(".modal-tab");
+var tabUrl = document.getElementById("tab-url");
+var tabTorrent = document.getElementById("tab-torrent");
+var tabUrlActions = document.getElementById("tab-url-actions");
+var tabTorrentActions = document.getElementById("tab-torrent-actions");
+var torrentUrlInput = document.getElementById("torrent-url");
+var btnAddTorrent = document.getElementById("btn-add-torrent-url");
+var torrentFilesSection = document.getElementById("torrent-files-section");
+var torrentFileListModal = document.getElementById("torrent-file-list-modal");
+var selectAllFiles = document.getElementById("select-all-files");
+var btnCancelTorrent = document.getElementById("btn-cancel-torrent");
+var btnStartTorrent = document.getElementById("btn-start-torrent");
+var btnCloseAdd2 = document.getElementById("btn-close-add-2");
+modalTabs.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    modalTabs.forEach((t2) => t2.classList.remove("active"));
+    tab.classList.add("active");
+    const t = tab.getAttribute("data-tab");
+    if (t === "url") {
+      if (tabUrl)
+        tabUrl.style.display = "flex";
+      if (tabTorrent)
+        tabTorrent.style.display = "none";
+      if (tabUrlActions)
+        tabUrlActions.style.display = "flex";
+      if (tabTorrentActions)
+        tabTorrentActions.style.display = "none";
+    } else {
+      if (tabUrl)
+        tabUrl.style.display = "none";
+      if (tabTorrent)
+        tabTorrent.style.display = "flex";
+      if (tabUrlActions)
+        tabUrlActions.style.display = "none";
+      if (tabTorrentActions)
+        tabTorrentActions.style.display = "flex";
+    }
+    hideTorrentFileSelection();
+  });
+});
+function showTorrentFileSelection(job) {
+  addedTorrentJob = job;
+  if (torrentFilesSection)
+    torrentFilesSection.style.display = "block";
+  if (torrentUrlInput)
+    torrentUrlInput.style.display = "none";
+  if (btnAddTorrent)
+    btnAddTorrent.style.display = "none";
+  if (torrentFileListModal && job.files) {
+    torrentFileListModal.innerHTML = job.files.map((f, i) => `
+      <label class="torrent-file-row-modal" data-idx="${i}">
+        <input type="checkbox" class="file-checkbox" data-idx="${i}" ${f.selected ? "checked" : ""}>
+        <span class="file-path">${f.path}</span>
+        <span class="file-size">${formatBytes(f.length)}</span>
+      </label>
+    `).join("");
+  }
+  if (selectAllFiles)
+    selectAllFiles.checked = true;
+}
+function hideTorrentFileSelection() {
+  addedTorrentJob = null;
+  if (torrentFilesSection)
+    torrentFilesSection.style.display = "none";
+  if (torrentUrlInput)
+    torrentUrlInput.style.display = "";
+  if (btnAddTorrent)
+    btnAddTorrent.style.display = "";
+  if (torrentFileListModal)
+    torrentFileListModal.innerHTML = "";
+  torrentFileDataUrl = null;
+  if (torrentFileName) {
+    torrentFileName.textContent = "";
+    torrentFileName.style.display = "none";
+  }
+  if (torrentDropZone) {
+    const content = torrentDropZone.querySelector(".torrent-drop-content");
+    if (content)
+      content.style.display = "";
+  }
+  if (torrentFileInput)
+    torrentFileInput.value = "";
+}
+if (selectAllFiles) {
+  selectAllFiles.addEventListener("change", () => {
+    const checkboxes = document.querySelectorAll(".file-checkbox");
+    checkboxes.forEach((cb) => {
+      cb.checked = selectAllFiles.checked;
+    });
+  });
+}
+if (torrentFileListModal) {
+  torrentFileListModal.addEventListener("change", () => {
+    const checkboxes = document.querySelectorAll(".file-checkbox");
+    const allChecked = Array.from(checkboxes).every((cb) => cb.checked);
+    if (selectAllFiles)
+      selectAllFiles.checked = allChecked;
+  });
+}
+var torrentFileInput = document.getElementById("torrent-file-input");
+var torrentDropZone = document.getElementById("torrent-drop-zone");
+var torrentFileName = document.getElementById("torrent-file-name");
+var torrentFileDataUrl = null;
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader;
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+function handleTorrentFile(file) {
+  if (!file.name.toLowerCase().endsWith(".torrent") && file.type !== "application/x-bittorrent") {
+    alert("Please select a valid .torrent file.");
+    return;
+  }
+  readFileAsDataURL(file).then((dataUrl) => {
+    torrentFileDataUrl = dataUrl;
+    if (torrentFileName) {
+      torrentFileName.textContent = `\uD83D\uDCC4 ${file.name} (${formatBytes(file.size)})`;
+      torrentFileName.style.display = "block";
+    }
+    if (torrentDropZone) {
+      const content = torrentDropZone.querySelector(".torrent-drop-content");
+      if (content)
+        content.style.display = "none";
+    }
+  }).catch((err) => {
+    alert(`Failed to read file: ${err.message}`);
+  });
+}
+if (torrentFileInput) {
+  torrentFileInput.addEventListener("change", () => {
+    const file = torrentFileInput.files?.[0];
+    if (file)
+      handleTorrentFile(file);
+  });
+}
+if (torrentDropZone) {
+  torrentDropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    torrentDropZone.classList.add("drag-over");
+  });
+  torrentDropZone.addEventListener("dragleave", () => {
+    torrentDropZone.classList.remove("drag-over");
+  });
+  torrentDropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    torrentDropZone.classList.remove("drag-over");
+    const file = e.dataTransfer?.files?.[0];
+    if (file)
+      handleTorrentFile(file);
+  });
+}
+if (btnAddTorrent) {
+  btnAddTorrent.addEventListener("click", async () => {
+    const textUrl = (torrentUrlInput?.value || "").trim();
+    const url = torrentFileDataUrl || textUrl;
+    if (!url) {
+      alert("Please enter a magnet link, torrent URL, or select a .torrent file.");
+      return;
+    }
+    if (btnAddTorrent) {
+      btnAddTorrent.textContent = "Loading...";
+      btnAddTorrent.disabled = true;
+    }
+    try {
+      const res = await fetch("/api/jobs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+      if (res.ok) {
+        const job = await res.json();
+        if (job.files && job.files.length > 0) {
+          showTorrentFileSelection(job);
+        } else {
+          hideAddModal();
+        }
+      } else {
+        const errText = await res.text();
+        alert(`Failed to add torrent: ${errText}`);
+      }
+    } catch (err) {
+      alert(`Network error adding torrent: ${err.message}`);
+    } finally {
+      if (btnAddTorrent) {
+        btnAddTorrent.textContent = "Add Torrent";
+        btnAddTorrent.disabled = false;
+      }
+    }
+  });
+}
+if (btnStartTorrent) {
+  btnStartTorrent.addEventListener("click", async () => {
+    if (!addedTorrentJob)
+      return;
+    const jobId = addedTorrentJob.id;
+    const checkboxes = document.querySelectorAll(".file-checkbox");
+    const selectedIndices = [];
+    const deselectedIndices = [];
+    checkboxes.forEach((cb) => {
+      const idx = parseInt(cb.getAttribute("data-idx") || "", 10);
+      if (!isNaN(idx)) {
+        if (cb.checked)
+          selectedIndices.push(idx);
+        else
+          deselectedIndices.push(idx);
+      }
+    });
+    if (deselectedIndices.length > 0) {
+      try {
+        await fetch(`/api/torrents/${jobId}/select`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ indices: deselectedIndices, selected: false })
+        });
+      } catch {}
+    }
+    hideAddModal();
+  });
+}
+if (btnCancelTorrent) {
+  btnCancelTorrent.addEventListener("click", () => {
+    if (addedTorrentJob) {
+      fetch(`/api/jobs/${addedTorrentJob.id}`, { method: "DELETE" }).catch(() => {});
+    }
+    hideTorrentFileSelection();
+  });
 }
 function showExtensionModal() {
   if (extensionModalOverlay) {
@@ -477,6 +866,14 @@ if (btnOpenAdd)
   btnOpenAdd.addEventListener("click", showAddModal);
 if (btnCloseAdd)
   btnCloseAdd.addEventListener("click", hideAddModal);
+if (btnCloseAdd2)
+  btnCloseAdd2.addEventListener("click", hideAddModal);
+if (addModalOverlay) {
+  addModalOverlay.addEventListener("click", (e) => {
+    if (e.target === addModalOverlay)
+      hideAddModal();
+  });
+}
 if (btnGetExtension)
   btnGetExtension.addEventListener("click", showExtensionModal);
 if (btnCloseExtension)
@@ -541,7 +938,7 @@ if (btnSubmitDownload) {
   btnSubmitDownload.addEventListener("click", async () => {
     let url = inputUrl.value.trim();
     if (!url) {
-      alert("Please enter a valid file URL.");
+      alert("Please enter a valid URL or magnet link.");
       return;
     }
     if (ytQualityGroup && ytQualityGroup.style.display === "block" && downloadQuality) {

@@ -20,5 +20,5 @@
     "outDir": "dist",
     "types": ["node"]
   },
-  "include": ["src/index.ts"]
+  "include": ["src/index.ts", "src/@types"]
 }

@@ -1,15 +1,23 @@
 import { listJobs } from '../../store/jobs';
+import { listTorrentJobs } from '../../store/torrents';
 import { loadConfig } from '../../core/config';
 import { formatBytes, formatSpeed, formatETA } from '../ui/utils';
 import type { DownloadJob } from '../../core/types';
+import type { TorrentJob } from '../../core/types-torrent';
 
-async function getJobsFromDaemon(port = 7474): Promise<DownloadJob[] | null> {
+function isTorrentJob(j: any): j is TorrentJob {
+  return j?.type === 'torrent';
+}
+
+async function getJobsFromDaemon(port = 7474): Promise<{ http: DownloadJob[]; torrent: TorrentJob[] } | null> {
   try {
-    const res = await fetch(`http://localhost:${port}/api/jobs`, {
-      signal: AbortSignal.timeout(500),
-    });
+    const res = await fetch(`http://localhost:${port}/api/jobs`, { signal: AbortSignal.timeout(500) });
     if (res.ok) {
-      return (await res.json()) as DownloadJob[];
+      const all = await res.json() as any[];
+      return {
+        http: all.filter((j) => !isTorrentJob(j)) as DownloadJob[],
+        torrent: all.filter(isTorrentJob) as TorrentJob[],
+      };
     }
     return null;
   } catch {
@@ -21,44 +29,73 @@ export async function listCommand() {
   const config = loadConfig();
   const port = config.serverPort;
 
-  let jobs: DownloadJob[] = [];
-  const daemonJobs = await getJobsFromDaemon(port);
+  let httpJobs: DownloadJob[] = [];
+  let torrentJobs: TorrentJob[] = [];
 
+  const daemonJobs = await getJobsFromDaemon(port);
   if (daemonJobs) {
-    jobs = daemonJobs;
+    httpJobs = daemonJobs.http;
+    torrentJobs = daemonJobs.torrent;
   } else {
-    jobs = await listJobs();
+    httpJobs = await listJobs();
+    torrentJobs = await listTorrentJobs();
   }
 
-  if (jobs.length === 0) {
+  const allJobs = [...httpJobs, ...torrentJobs];
+
+  if (allJobs.length === 0) {
     console.log('No downloads found.');
     return;
   }
 
-  // Format and print header
   const pad = (str: string, width: number) => {
     if (str.length > width) return str.slice(0, width - 3) + '...';
     return str.padEnd(width);
   };
 
   console.log(
-    ` ${pad('ID', 12)} ${pad('FILENAME', 30)} ${pad('STATUS', 15)} ${pad('PROGRESS', 12)} ${pad('SPEED', 12)} ${pad('ETA', 12)}`
+    ` ${pad('ID', 12)} ${pad('NAME', 30)} ${pad('STATUS', 15)} ${pad('PROGRESS', 12)} ${pad('SPEED', 12)} ${pad('ETA', 12)}`
   );
   console.log('—'.repeat(99));
 
-  for (const job of jobs) {
-    const percent = job.totalBytes > 0 ? (job.downloadedBytes / job.totalBytes) * 100 : 0;
-    const progressStr = `${Math.round(percent)}% (${formatBytes(job.downloadedBytes)}/${job.totalBytes > 0 ? formatBytes(job.totalBytes) : 'Unknown'})`;
-    
-    let etaStr = '--';
-    if (job.status === 'downloading') {
-      etaStr = formatETA(job.eta).replace('ETA ', '');
+  for (const job of allJobs) {
+    let name: string;
+    let totalBytes: number;
+    let downloadedBytes: number;
+    let status: string;
+    let speed: number;
+    let eta: number;
+
+    if ('type' in job && job.type === 'torrent') {
+      const t = job as TorrentJob;
+      name = t.name;
+      totalBytes = t.totalLength;
+      downloadedBytes = t.downloaded;
+      status = t.status;
+      speed = t.speed;
+      eta = t.eta;
+    } else {
+      const d = job as DownloadJob;
+      name = d.filename;
+      totalBytes = d.totalBytes;
+      downloadedBytes = d.downloadedBytes;
+      status = d.status;
+      speed = d.speed;
+      eta = d.eta;
     }
 
-    const speedStr = job.status === 'downloading' ? formatSpeed(job.speed) : '0 B/s';
+    const percent = totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0;
+    const progressStr = `${Math.round(percent)}% (${formatBytes(downloadedBytes)}/${totalBytes > 0 ? formatBytes(totalBytes) : 'Unknown'})`;
+
+    let etaStr = '--';
+    if (status === 'downloading') {
+      etaStr = formatETA(eta).replace('ETA ', '');
+    }
+
+    const speedStr = status === 'downloading' ? formatSpeed(speed) : '0 B/s';
 
     console.log(
-      ` ${pad(job.id, 12)} ${pad(job.filename, 30)} ${pad(job.status.toUpperCase(), 15)} ${pad(progressStr, 12)} ${pad(speedStr, 12)} ${pad(etaStr, 12)}`
+      ` ${pad(job.id, 12)} ${pad(name, 30)} ${pad(status.toUpperCase(), 15)} ${pad(progressStr, 12)} ${pad(speedStr, 12)} ${pad(etaStr, 12)}`
     );
   }
 }

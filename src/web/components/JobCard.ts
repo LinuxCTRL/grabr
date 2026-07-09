@@ -1,6 +1,9 @@
 import type { DownloadJob } from '../../core/types';
+import type { TorrentJob } from '../../core/types-torrent';
 import { getProgressRingHtml } from './ProgressRing';
 import { formatBytes, formatSpeed, formatETA } from '../utils';
+
+type AnyJob = DownloadJob | TorrentJob;
 
 export function getFileIcon(filename: string): string {
   const ext = filename.split('.').pop()?.toLowerCase();
@@ -14,33 +17,46 @@ export function getFileIcon(filename: string): string {
   return '⬇️';
 }
 
-export function getJobCardHtml(job: DownloadJob, isSelected: boolean): string {
-  const percent = job.totalBytes > 0 ? (job.downloadedBytes / job.totalBytes) * 100 : 0;
+function isTorrentJob(job: AnyJob): job is TorrentJob {
+  return (job as TorrentJob).type === 'torrent';
+}
+
+export function getJobCardHtml(job: AnyJob, isSelected: boolean): string {
+  const isTorrent = isTorrentJob(job);
+
+  const totalBytes = isTorrent ? (job as TorrentJob).totalLength : (job as DownloadJob).totalBytes;
+  const downloadedBytes = isTorrent ? (job as TorrentJob).downloaded : (job as DownloadJob).downloadedBytes;
+  const filename = isTorrent ? (job as TorrentJob).name : (job as DownloadJob).filename;
+  const status = job.status;
+
+  const percent = totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0;
   const activeClass = isSelected ? 'active' : '';
 
   let speedText = '--';
   let etaText = '--';
-  
-  if (job.status === 'downloading') {
-    speedText = formatSpeed(job.speed);
+
+  if (status === 'downloading') {
+    speedText = isTorrent ? `${formatSpeed(job.speed)} | ${(job as TorrentJob).peers} peers` : formatSpeed(job.speed);
     etaText = formatETA(job.eta);
-  } else if (job.status === 'completed') {
+  } else if (status === 'completed') {
     speedText = 'Completed';
     etaText = 'Done';
-  } else if (job.status === 'paused') {
+  } else if (status === 'paused') {
     speedText = 'Paused';
     etaText = 'Resumable';
-  } else if (job.status === 'queued') {
+  } else if (status === 'queued') {
     speedText = 'Queued';
     etaText = 'Waiting...';
-  } else if (job.status === 'failed') {
+  } else if (status === 'failed') {
     speedText = 'Failed';
     etaText = 'Error';
+  } else if (status === 'seeding') {
+    speedText = 'Seeding';
+    etaText = '₿';
   }
 
-  // Choose control buttons based on status
   let actionButton = '';
-  if (job.status === 'downloading' || job.status === 'queued') {
+  if (status === 'downloading' || status === 'queued') {
     actionButton = `
       <button class="btn-action-icon action-btn" data-action="pause" data-id="${job.id}" title="Pause">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -49,7 +65,7 @@ export function getJobCardHtml(job: DownloadJob, isSelected: boolean): string {
         </svg>
       </button>
     `;
-  } else if (job.status === 'paused' || job.status === 'failed') {
+  } else if (status === 'paused' || status === 'failed' || status === 'seeding') {
     actionButton = `
       <button class="btn-action-icon action-btn" data-action="resume" data-id="${job.id}" title="Resume">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -68,20 +84,22 @@ export function getJobCardHtml(job: DownloadJob, isSelected: boolean): string {
     </button>
   `;
 
-  const icon = getFileIcon(job.filename);
-  const sizeText = `${formatBytes(job.downloadedBytes)} of ${job.totalBytes > 0 ? formatBytes(job.totalBytes) : 'Unknown'}`;
+  const icon = isTorrent ? '🧲' : getFileIcon(filename);
+  const sizeText = `${formatBytes(downloadedBytes)} of ${totalBytes > 0 ? formatBytes(totalBytes) : 'Unknown'}`;
+
+  const badge = isTorrent ? '<span class="torrent-badge">TORRENT</span>' : '';
 
   return `
     <div class="job-card ${activeClass}" data-id="${job.id}">
       <span style="font-size: 1.5rem; flex-shrink: 0; user-select: none;">${icon}</span>
       
       <div class="job-card-header">
-        <span class="job-title" title="${job.filename}">${job.filename}</span>
-        <span class="job-meta-desc">${sizeText} | ${job.status.toUpperCase()}</span>
+        <span class="job-title" title="${filename}">${filename}${badge}</span>
+        <span class="job-meta-desc">${sizeText} | ${status.toUpperCase()}</span>
       </div>
 
       <div class="progress-ring-container">
-        ${getProgressRingHtml(percent, job.status)}
+        ${getProgressRingHtml(percent, status)}
         <span class="progress-ring-text">${Math.round(percent)}%</span>
       </div>
 
