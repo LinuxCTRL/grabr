@@ -1,12 +1,13 @@
 import React from 'react';
 import { render } from 'ink';
+import { existsSync, readFileSync } from 'node:fs';
 import { Dashboard } from '../ui/Dashboard';
 import { Downloader } from '../../core/downloader';
 import { loadConfig } from '../../core/config';
 
 async function isDaemonRunning(port = 7474): Promise<boolean> {
   try {
-    const res = await fetch(`http://localhost:${port}/api/jobs`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
       signal: AbortSignal.timeout(500),
     });
     return res.ok;
@@ -44,12 +45,22 @@ export async function addCommand(args: string[]) {
     process.exit(1);
   }
 
+  const isLocalFile = !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('magnet:') && !url.startsWith('data:');
+  if (isLocalFile && existsSync(url)) {
+    try {
+      const buffer = readFileSync(url);
+      url = `data:application/x-bittorrent;base64,${buffer.toString('base64')}`;
+    } catch (err: any) {
+      console.warn(`Warning: Could not read local file ${url}: ${err.message}`);
+    }
+  }
+
   const running = await isDaemonRunning(port);
 
   if (running) {
     // Add via Daemon HTTP POST
     try {
-      const response = await fetch(`http://localhost:${port}/api/jobs`, {
+      const response = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

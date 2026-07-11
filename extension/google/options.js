@@ -24,7 +24,7 @@ interceptAllInput.addEventListener('change', () => {
 function restoreOptions() {
   chrome.storage.local.get({
     enabled: true,
-    serverUrl: 'http://localhost:7474',
+    serverUrl: 'http://127.0.0.1:7474',
     interceptAll: false,
     fileTypes: 'zip,rar,tar,gz,7z,dmg,pkg,iso,exe,msi,pdf,mp4,mkv,avi,mp3',
     defaultChunks: 4,
@@ -51,7 +51,7 @@ function restoreOptions() {
 // Save settings to storage
 function saveOptions() {
   const enabled = enabledInput.checked;
-  let serverUrl = serverUrlInput.value.trim() || 'http://localhost:7474';
+  let serverUrl = serverUrlInput.value.trim() || 'http://127.0.0.1:7474';
   
   // Ensure protocol is present
   if (!/^https?:\/\//i.test(serverUrl)) {

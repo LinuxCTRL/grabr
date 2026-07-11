@@ -29,3 +29,16 @@ export function formatETA(seconds: number): string {
   }
   return `ETA ${m}:${pad(s)}`;
 }
+
+export function normalizeJob(job: any): any {
+  if (!job) return job;
+  if (job.type === 'torrent') {
+    return {
+      ...job,
+      filename: job.name || job.filename || '',
+      downloadedBytes: job.downloaded !== undefined ? job.downloaded : job.downloadedBytes,
+      totalBytes: job.totalLength !== undefined ? job.totalLength : job.totalBytes,
+    };
+  }
+  return job;
+}

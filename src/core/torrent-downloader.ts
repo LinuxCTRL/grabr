@@ -1,12 +1,47 @@
 import { EventEmitter } from 'node:events';
-import { join } from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { renameSync, existsSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { homedir } from 'node:os';
 import { nanoid } from 'nanoid';
 import type { TorrentJob, TorrentFileInfo } from './types-torrent';
 import { loadConfig, type GrabrConfig } from './config';
-import { homedir } from 'node:os';
 import type { WebTorrentInstance, Torrent } from 'webtorrent';
 import { createTorrentJob, updateTorrentJob, listTorrentJobs, deleteTorrentJob } from '../store/torrents';
+
+// Disable native binaries that cause Bun to crash due to unsupported libuv functions.
+// Renaming them to .bak forces the modules (utp-native and fs-native-extensions)
+// to catch load errors and safely fall back to pure JS/TCP operations.
+function disableNativeBinaries() {
+  try {
+    // Disable utp-native
+    try {
+      const pkgPath = require.resolve('utp-native/package.json');
+      const pkgDir = dirname(pkgPath);
+      const platforms = ['linux-x64', 'win32-x64'];
+      for (const plat of platforms) {
+        const file = join(pkgDir, 'prebuilds', plat, 'node.napi.node');
+        if (existsSync(file)) {
+          renameSync(file, file + '.bak');
+        }
+      }
+    } catch {}
+
+    // Disable fs-native-extensions
+    try {
+      const pkgPath = require.resolve('fs-native-extensions/package.json');
+      const pkgDir = dirname(pkgPath);
+      const platforms = ['linux-x64', 'win32-x64'];
+      for (const plat of platforms) {
+        const file = join(pkgDir, 'prebuilds', plat, 'fs-native-extensions.node');
+        if (existsSync(file)) {
+          renameSync(file, file + '.bak');
+        }
+      }
+    } catch {}
+  } catch {}
+}
+
+disableNativeBinaries();
 
 const stateDir = join(homedir(), '.grabr', 'torrents');
 
@@ -30,8 +65,22 @@ export class TorrentDownloader extends EventEmitter {
       tracker: tc.dhtEnabled,
       maxConns: tc.maxPeers,
       path: tc.downloadDir,
+      natUpnp: false,
+      natPmp: false,
+    } as any);
+    this.client.on('error', (err: any) => {
+      console.error('WebTorrent client error:', err);
     });
     return this.client;
+  }
+
+  private decodeInput(input: string | Buffer): string | Buffer {
+    if (typeof input === 'string' && input.startsWith('data:') && input.includes(';base64,')) {
+      const parts = input.split(';base64,');
+      const base64 = parts[1] || '';
+      if (base64) return Buffer.from(base64, 'base64');
+    }
+    return input;
   }
 
   async add(input: string | Buffer, outputDir?: string): Promise<TorrentJob> {
@@ -40,12 +89,33 @@ export class TorrentDownloader extends EventEmitter {
 
     const client = await this.getClient();
 
-    // Decode base64 data URL to Buffer
     let resolvedInput: string | Buffer = input;
-    if (typeof input === 'string' && input.startsWith('data:') && input.includes(';base64,')) {
-      const parts = input.split(';base64,');
-      const base64 = parts[1] || '';
-      if (base64) resolvedInput = Buffer.from(base64, 'base64');
+    let savedInput: string = '';
+
+    if (typeof input === 'string') {
+      if (input.startsWith('data:') && input.includes(';base64,')) {
+        const parts = input.split(';base64,');
+        const base64 = parts[1] || '';
+        if (base64) resolvedInput = Buffer.from(base64, 'base64');
+        savedInput = input;
+      } else if (input.startsWith('http://') || input.startsWith('https://')) {
+        try {
+          const response = await fetch(input);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch torrent: HTTP ${response.status} ${response.statusText}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          resolvedInput = Buffer.from(arrayBuffer);
+          savedInput = `data:application/x-bittorrent;base64,${resolvedInput.toString('base64')}`;
+        } catch (err: any) {
+          throw new Error(`Failed to download torrent URL: ${err.message}`);
+        }
+      } else {
+        savedInput = input;
+      }
+    } else {
+      resolvedInput = input;
+      savedInput = `data:application/x-bittorrent;base64,${input.toString('base64')}`;
     }
 
     return new Promise((resolve, reject) => {
@@ -67,7 +137,7 @@ export class TorrentDownloader extends EventEmitter {
         const job: TorrentJob = {
           id: torrentId,
           type: 'torrent',
-          input: typeof resolvedInput === 'string' ? resolvedInput : '(buffer)',
+          input: savedInput,
           infoHash: t.infoHash,
           name: t.name,
           files,
@@ -102,7 +172,9 @@ export class TorrentDownloader extends EventEmitter {
     const addOpts: any = { path: this.config.outputDir };
     const trackers = this.config.torrent.trackers;
     if (trackers.length > 0) addOpts.announce = trackers;
-    const torrent = client.add(job.input, addOpts, (t: Torrent) => {
+
+    const resolvedInput = this.decodeInput(job.input);
+    const torrent = client.add(resolvedInput, addOpts, (t: Torrent) => {
       job.infoHash = t.infoHash;
       job.name = t.name;
       job.totalLength = t.length;
@@ -197,29 +269,26 @@ export class TorrentDownloader extends EventEmitter {
       (t) => this.activeJobs.get(jobId)?.infoHash === t.infoHash
     );
     if (clientTorrent) {
-      clientTorrent.pause();
+      clientTorrent.destroy();
     }
     const job = this.activeJobs.get(jobId);
     if (job) {
       job.status = 'paused';
+      // Reset speed and ETA when paused
+      job.speed = 0;
+      job.eta = -1;
       updateTorrentJob({ id: jobId, status: 'paused' }).catch(() => {});
       this.emit('torrent:status', { jobId, status: 'paused' });
     }
   }
 
   resume(jobId: string) {
-    if (!this.client) return;
-    const clientTorrent = this.client.torrents.find(
-      (t) => this.activeJobs.get(jobId)?.infoHash === t.infoHash
-    );
-    if (clientTorrent) {
-      clientTorrent.resume();
-    }
     const job = this.activeJobs.get(jobId);
     if (job) {
       job.status = 'downloading';
       updateTorrentJob({ id: jobId, status: 'downloading' }).catch(() => {});
       this.emit('torrent:status', { jobId, status: 'downloading' });
+      this.restore(job).catch(() => {});
     }
   }
 
@@ -290,7 +359,7 @@ export class TorrentDownloader extends EventEmitter {
 export function isTorrentInput(input: string): boolean {
   return (
     input.startsWith('magnet:') ||
-    input.startsWith('data:application/x-bittorrent') ||
+    input.startsWith('data:') ||
     input.endsWith('.torrent') ||
     input.includes('.torrent')
   );

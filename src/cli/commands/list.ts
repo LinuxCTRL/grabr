@@ -11,7 +11,7 @@ function isTorrentJob(j: any): j is TorrentJob {
 
 async function getJobsFromDaemon(port = 7474): Promise<{ http: DownloadJob[]; torrent: TorrentJob[] } | null> {
   try {
-    const res = await fetch(`http://localhost:${port}/api/jobs`, { signal: AbortSignal.timeout(500) });
+    const res = await fetch(`http://127.0.0.1:${port}/api/jobs`, { signal: AbortSignal.timeout(500) });
     if (res.ok) {
       const all = await res.json() as any[];
       return {

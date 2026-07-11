@@ -24,7 +24,14 @@ async function init(): Promise<void> {
         const dir = dirname(fileURLToPath(import.meta.url));
         const localWasm = resolve(dir, file);
         if (existsSync(localWasm)) return localWasm;
-        return resolve(dir, '..', 'node_modules', 'sql.js', 'dist', file);
+        
+        const candidate1 = resolve(dir, '..', 'node_modules', 'sql.js', 'dist', file);
+        if (existsSync(candidate1)) return candidate1;
+        
+        const candidate2 = resolve(dir, '..', '..', 'node_modules', 'sql.js', 'dist', file);
+        if (existsSync(candidate2)) return candidate2;
+        
+        return candidate1;
       },
     });
 

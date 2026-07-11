@@ -1,11 +1,12 @@
 import { createInterface } from 'node:readline';
+import { existsSync, readFileSync } from 'node:fs';
 import { listTorrentJobs, getTorrentJob } from '../../store/torrents';
 import { loadConfig } from '../../core/config';
 import { formatBytes } from '../ui/utils';
 
 async function getTorrentsFromDaemon(port = 7474) {
   try {
-    const res = await fetch(`http://localhost:${port}/api/jobs`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
       signal: AbortSignal.timeout(500),
     });
     if (res.ok) {
@@ -20,7 +21,7 @@ async function getTorrentsFromDaemon(port = 7474) {
 
 async function getTorrentFromDaemon(id: string, port = 7474) {
   try {
-    const res = await fetch(`http://localhost:${port}/api/torrents/${id}`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/torrents/${id}`, {
       signal: AbortSignal.timeout(500),
     });
     if (res.ok) return await res.json();
@@ -51,14 +52,24 @@ export async function torrentCommand(args: string[]) {
   }
 
   if (subcommand === 'add') {
-    const url = args[1];
+    let url = args[1];
     if (!url) {
       console.error('Usage: grabr torrent add <url|magnet|file>');
       return;
     }
 
+    const isLocalFile = !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('magnet:') && !url.startsWith('data:');
+    if (isLocalFile && existsSync(url)) {
+      try {
+        const buffer = readFileSync(url);
+        url = `data:application/x-bittorrent;base64,${buffer.toString('base64')}`;
+      } catch (err: any) {
+        console.warn(`Warning: Could not read local file ${url}: ${err.message}`);
+      }
+    }
+
     try {
-      const res = await fetch(`http://localhost:${port}/api/jobs`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -96,14 +107,14 @@ export async function torrentCommand(args: string[]) {
         if (indices.length > 0 && indices.length < job.files.length) {
           // Deselect all files first
           const allIndices = [...Array(job.files.length).keys()];
-          await fetch(`http://localhost:${port}/api/torrents/${job.id}/select`, {
+          await fetch(`http://127.0.0.1:${port}/api/torrents/${job.id}/select`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ indices: allIndices, selected: false }),
             signal: AbortSignal.timeout(2000),
           });
           // Then select the chosen ones
-          await fetch(`http://localhost:${port}/api/torrents/${job.id}/select`, {
+          await fetch(`http://127.0.0.1:${port}/api/torrents/${job.id}/select`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ indices, selected: true }),
@@ -250,7 +261,7 @@ export async function torrentCommand(args: string[]) {
 
     // Try daemon API first
     try {
-      const res = await fetch(`http://localhost:${port}/api/torrents/${id}/select`, {
+      const res = await fetch(`http://127.0.0.1:${port}/api/torrents/${id}/select`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ indices, selected }),

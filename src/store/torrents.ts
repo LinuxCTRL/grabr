@@ -63,6 +63,20 @@ export async function createTorrentJob(job: TorrentJob): Promise<void> {
 }
 
 export async function updateTorrentJob(job: Partial<TorrentJob> & { id: string }): Promise<void> {
+  const existing = await getTorrentJob(job.id);
+  if (!existing) return;
+
+  const input = job.input !== undefined ? job.input : existing.input;
+  const infoHash = job.infoHash !== undefined ? job.infoHash : existing.infoHash;
+  const name = job.name !== undefined ? job.name : existing.name;
+  const files = job.files !== undefined ? job.files : existing.files;
+  const totalLength = job.totalLength !== undefined ? job.totalLength : existing.totalLength;
+  const downloaded = job.downloaded !== undefined ? job.downloaded : existing.downloaded;
+  const status = job.status !== undefined ? job.status : existing.status;
+  const seedRatio = job.seedRatio !== undefined ? job.seedRatio : existing.seedRatio;
+  const seedTime = job.seedTime !== undefined ? job.seedTime : existing.seedTime;
+  const error = job.error !== undefined ? job.error : existing.error;
+
   await queryRun(
     `UPDATE torrents
      SET input = ?, info_hash = ?, name = ?, files = ?, total_length = ?,
@@ -70,17 +84,17 @@ export async function updateTorrentJob(job: Partial<TorrentJob> & { id: string }
          updated_at = ?, error = ?
      WHERE job_id = ?`,
     [
-      job.input ?? '',
-      job.infoHash ?? '',
-      job.name ?? '',
-      JSON.stringify(job.files ?? []),
-      job.totalLength ?? 0,
-      job.downloaded ?? 0,
-      job.status ?? 'downloading',
-      job.seedRatio ?? 0,
-      job.seedTime ?? 0,
+      input,
+      infoHash,
+      name,
+      JSON.stringify(files),
+      totalLength,
+      downloaded,
+      status,
+      seedRatio,
+      seedTime,
       Date.now(),
-      job.error ?? null,
+      error || null,
       job.id,
     ]
   );

@@ -4,7 +4,7 @@ import { deleteResumeState } from '../../core/resume';
 
 async function isDaemonRunning(port = 7474): Promise<boolean> {
   try {
-    const res = await fetch(`http://localhost:${port}/api/jobs`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
       signal: AbortSignal.timeout(500),
     });
     return res.ok;
@@ -26,7 +26,7 @@ export async function removeCommand(id: string) {
 
   if (running) {
     try {
-      const res = await fetch(`http://localhost:${port}/api/jobs/${id}`, { method: 'DELETE' });
+      const res = await fetch(`http://127.0.0.1:${port}/api/jobs/${id}`, { method: 'DELETE' });
       if (res.ok) {
         console.log(`Removed job ${id}.`);
       } else {

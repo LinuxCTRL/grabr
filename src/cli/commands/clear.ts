@@ -3,7 +3,7 @@ import { clearCompletedJobs } from '../../store/jobs';
 
 async function isDaemonRunning(port = 7474): Promise<boolean> {
   try {
-    const res = await fetch(`http://localhost:${port}/api/jobs`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
       signal: AbortSignal.timeout(500),
     });
     return res.ok;
@@ -27,7 +27,7 @@ export async function clearCommand(args: string[]) {
 
   if (running) {
     try {
-      const res = await fetch(`http://localhost:${port}/api/jobs/clear-completed`, { method: 'POST' });
+      const res = await fetch(`http://127.0.0.1:${port}/api/jobs/clear-completed`, { method: 'POST' });
       if (res.ok) {
         console.log('Cleared completed jobs from daemon.');
       } else {

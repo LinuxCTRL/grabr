@@ -92,7 +92,7 @@ app.get(
 
 app.get('/api/version', async (c) => {
   const version = process.env.GRABR_VERSION;
-  return c.json({ version: version || '1.0.11' });
+  return c.json({ version: version || '1.0.14' });
 });
 
 app.get('/api/jobs', async (c) => {
@@ -211,6 +211,27 @@ app.post('/api/torrents/:id/select', async (c) => {
   }
 });
 
+app.post('/api/torrents/:id/pause', async (c) => {
+  try {
+    const id = c.req.param('id');
+    await downloader.pauseJob(id);
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.text(err.message, 500);
+  }
+});
+
+app.post('/api/torrents/:id/resume', async (c) => {
+  try {
+    const id = c.req.param('id');
+    await downloader.resumeJob(id);
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.text(err.message, 500);
+  }
+});
+
+
 app.post('/api/jobs/:id/pause', async (c) => {
   const id = c.req.param('id');
   await downloader.pauseJob(id);
@@ -287,7 +308,7 @@ app.notFound((c) => {
   return c.text('Not Found', 404);
 });
 
-console.log(`Starting Grabr server on http://localhost:${port}`);
+console.log(`Starting Grabr server on http://127.0.0.1:${port}`);
 
 const server = Bun.serve({
   fetch: app.fetch,

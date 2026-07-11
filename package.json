@@ -1,6 +1,6 @@
 {
   "name": "@linuxctrl/grabr",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "A modern, elegant file downloader — CLI & library for Bun and Node.js",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -29,7 +29,7 @@
   "scripts": {
     "build": "bun run build:web && bun run build:server && bun run build:lib && bun run build:cli && bun run build:types",
     "build:web": "mkdir -p src/server/static/fonts && cp src/assets/OperatorMonoLig-Book.otf src/server/static/fonts/OperatorMonoLig-Book.otf && cp src/web/logo.png src/server/static/logo.png && cp src/web/index.html src/server/static/index.html && cp src/web/styles/main.css src/server/static/main.css && bun build src/web/main.ts --outdir src/server/static",
-    "build:server": "bun build src/server/index.ts --outfile dist/server.js --target bun --format esm --external webtorrent --define 'process.env.GRABR_VERSION=\"1.0.11\"' && rm -rf dist/static && cp -r src/server/static dist/static",
+    "build:server": "bun build src/server/index.ts --outfile dist/server.js --target bun --format esm --external webtorrent --define 'process.env.GRABR_VERSION=\"1.0.14\"' && rm -rf dist/static && cp -r src/server/static dist/static",
     "build:lib": "bun build src/index.ts --outfile dist/index.js --target node --format esm --external webtorrent && bun build src/index.ts --outfile dist/index.cjs --target node --format cjs --external webtorrent",
     "build:cli": "NODE_ENV=production bun build src/cli/index.tsx --outfile dist/cli.js --target node --format esm --external webtorrent --define 'process.env.NODE_ENV=\"production\"' && sed -i 's|#!/usr/bin/env bun|#!/usr/bin/env node|' dist/cli.js && sed -i '2{/^\\/\\/ @bun/d}' dist/cli.js && cp node_modules/sql.js/dist/sql-wasm.wasm dist/sql-wasm.wasm",
     "build:types": "tsc -p tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist",

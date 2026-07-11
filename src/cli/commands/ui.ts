@@ -3,7 +3,7 @@ import { loadConfig } from '../../core/config';
 
 async function isDaemonRunning(port = 7474): Promise<boolean> {
   try {
-    const res = await fetch(`http://localhost:${port}/api/jobs`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
       signal: AbortSignal.timeout(500),
     });
     return res.ok;
@@ -26,7 +26,7 @@ function openBrowser(url: string) {
 export async function uiCommand() {
   const config = loadConfig();
   const port = config.serverPort;
-  const url = `http://localhost:${port}`;
+  const url = `http://127.0.0.1:${port}`;
 
   const running = await isDaemonRunning(port);
   if (!running) {

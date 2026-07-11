@@ -11,7 +11,7 @@ const statusLayout = document.getElementById('status-layout');
 // UI Elements (Common)
 const statusBadge = document.getElementById('status-badge');
 const statusText = document.getElementById('status-text');
-let serverUrl = 'http://localhost:7474';
+let serverUrl = 'http://127.0.0.1:7474';
 let ws = null;
 
 // Helper to format file size
@@ -65,7 +65,7 @@ if (downloadUrl) {
   fileSizeEl.textContent = formatBytes(totalBytes);
 
   chrome.storage.local.get({
-    serverUrl: 'http://localhost:7474',
+    serverUrl: 'http://127.0.0.1:7474',
     defaultChunks: 4,
     defaultOutputDir: ''
   }, (settings) => {
@@ -279,7 +279,7 @@ if (downloadUrl) {
   chrome.storage.local.get({
     enabled: true,
     interceptAll: false,
-    serverUrl: 'http://localhost:7474'
+    serverUrl: 'http://127.0.0.1:7474'
   }, (items) => {
     serverUrl = items.serverUrl.replace(/\/$/, '');
     daemonUrlDisplay.textContent = serverUrl;

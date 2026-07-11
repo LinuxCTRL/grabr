@@ -103,7 +103,7 @@ function batchDownloadLinks(text) {
   }
 
   chrome.storage.local.get({
-    serverUrl: 'http://localhost:7474',
+    serverUrl: 'http://127.0.0.1:7474',
     defaultChunks: 4
   }, async (settings) => {
     const serverUrl = settings.serverUrl.replace(/\/$/, '');
@@ -168,7 +168,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 async function updateBadge() {
   chrome.storage.local.get({
-    serverUrl: 'http://localhost:7474'
+    serverUrl: 'http://127.0.0.1:7474'
   }, async (settings) => {
     const serverUrl = settings.serverUrl.replace(/\/$/, '');
     try {
@@ -216,7 +216,7 @@ chrome.downloads.onCreated.addListener((downloadItem) => {
 
   chrome.storage.local.get({
     enabled: true,
-    serverUrl: 'http://localhost:7474',
+    serverUrl: 'http://127.0.0.1:7474',
     interceptAll: false,
     fileTypes: 'zip,rar,tar,gz,7z,dmg,pkg,iso,exe,msi,pdf,mp4,mkv,avi,mp3',
     minSizeMb: 0

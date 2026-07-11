@@ -6,7 +6,7 @@ import { JobRow } from './JobRow';
 import { listJobs } from '../../store/jobs';
 import type { Downloader } from '../../core/downloader';
 import packageJson from '../../../package.json';
-import { formatBytes, formatSpeed, formatETA } from './utils';
+import { formatBytes, formatSpeed, formatETA, normalizeJob } from './utils';
 import fs from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
@@ -225,8 +225,8 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
     }
   }, [ytSelectedFormatIndex, ytFormats]);
 
-  const apiBase = `http://localhost:${serverPort}/api`;
-  const wsUrl = `ws://localhost:${serverPort}/ws`;
+  const apiBase = `http://127.0.0.1:${serverPort}/api`;
+  const wsUrl = `ws://127.0.0.1:${serverPort}/ws`;
 
   // Load initial jobs
   useEffect(() => {
@@ -235,13 +235,13 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
     async function loadInitialJobs() {
       if (mode === 'local') {
         const localList = await listJobs();
-        if (active) setJobs(localList);
+        if (active) setJobs(localList.map(normalizeJob));
       } else {
         try {
           const res = await fetch(`${apiBase}/jobs`);
           if (res.ok) {
             const remoteList = (await res.json()) as DownloadJob[];
-            if (active) setJobs(remoteList);
+            if (active) setJobs(remoteList.map(normalizeJob));
           } else {
             if (active) setStatusMessage('Server API returned error status');
           }
@@ -261,7 +261,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
   useEffect(() => {
     if (mode === 'local' && downloader) {
       const handleAdded = (job: DownloadJob) => {
-        setJobs((prev) => [job, ...prev]);
+        setJobs((prev) => [normalizeJob(job), ...prev]);
       };
 
       const handleProgress = ({ jobId, downloadedBytes, speed, eta }: any) => {
@@ -288,16 +288,70 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
         setJobs((prev) => prev.filter((j) => j.id !== jobId));
       };
 
+      const handleTorrentProgress = ({ jobId, downloaded, speed, eta }: any) => {
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === jobId
+              ? { ...j, downloadedBytes: downloaded, speed, eta, updatedAt: Date.now() }
+              : j
+          )
+        );
+      };
+
+      const handleTorrentStatus = ({ jobId, status, error }: any) => {
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === jobId
+              ? { ...j, status: status === 'seeding' ? 'completed' : status, error, speed: 0, eta: -1, updatedAt: Date.now() }
+              : j
+          )
+        );
+      };
+
+      const handleTorrentDone = ({ jobId }: any) => {
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === jobId
+              ? { ...j, status: 'completed', speed: 0, eta: -1, downloadedBytes: j.totalBytes, updatedAt: Date.now() }
+              : j
+          )
+        );
+      };
+
+      const handleTorrentError = ({ jobId, error }: any) => {
+        setJobs((prev) =>
+          prev.map((j) =>
+            j.id === jobId
+              ? { ...j, status: 'failed', error, speed: 0, eta: -1, updatedAt: Date.now() }
+              : j
+          )
+        );
+      };
+
+      const handleTorrentRemoved = ({ jobId }: any) => {
+        setJobs((prev) => prev.filter((j) => j.id !== jobId));
+      };
+
       downloader.on('job:added', handleAdded);
       downloader.on('job:progress', handleProgress);
       downloader.on('job:status', handleStatus);
       downloader.on('job:removed', handleRemoved);
+      downloader.on('torrent:progress', handleTorrentProgress);
+      downloader.on('torrent:status', handleTorrentStatus);
+      downloader.on('torrent:done', handleTorrentDone);
+      downloader.on('torrent:error', handleTorrentError);
+      downloader.on('torrent:removed', handleTorrentRemoved);
 
       return () => {
         downloader.off('job:added', handleAdded);
         downloader.off('job:progress', handleProgress);
         downloader.off('job:status', handleStatus);
         downloader.off('job:removed', handleRemoved);
+        downloader.off('torrent:progress', handleTorrentProgress);
+        downloader.off('torrent:status', handleTorrentStatus);
+        downloader.off('torrent:done', handleTorrentDone);
+        downloader.off('torrent:error', handleTorrentError);
+        downloader.off('torrent:removed', handleTorrentRemoved);
       };
     } else if (mode === 'remote') {
       let ws: WebSocket | null = null;
@@ -344,8 +398,69 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
                 )
               );
             } else if (data.type === 'job:added') {
-              setJobs((prev) => [data.job, ...prev]);
+              setJobs((prev) => [normalizeJob(data.job), ...prev]);
             } else if (data.type === 'job:removed') {
+              setJobs((prev) => prev.filter((j) => j.id !== data.jobId));
+            } else if (data.type === 'torrent:progress') {
+              setJobs((prev) =>
+                prev.map((j) =>
+                  j.id === data.jobId
+                    ? {
+                        ...j,
+                        downloadedBytes: data.downloaded,
+                        speed: data.speed,
+                        eta: data.eta,
+                        updatedAt: Date.now(),
+                      }
+                    : j
+                )
+              );
+            } else if (data.type === 'torrent:status') {
+              setJobs((prev) =>
+                prev.map((j) =>
+                  j.id === data.jobId
+                    ? {
+                        ...j,
+                        status: data.status === 'seeding' ? 'completed' : data.status,
+                        error: data.error,
+                        speed: 0,
+                        eta: -1,
+                        updatedAt: Date.now(),
+                      }
+                    : j
+                )
+              );
+            } else if (data.type === 'torrent:done') {
+              setJobs((prev) =>
+                prev.map((j) =>
+                  j.id === data.jobId
+                    ? {
+                        ...j,
+                        status: 'completed',
+                        speed: 0,
+                        eta: -1,
+                        downloadedBytes: j.totalBytes,
+                        updatedAt: Date.now(),
+                      }
+                    : j
+                )
+              );
+            } else if (data.type === 'torrent:error') {
+              setJobs((prev) =>
+                prev.map((j) =>
+                  j.id === data.jobId
+                    ? {
+                        ...j,
+                        status: 'failed',
+                        error: data.error,
+                        speed: 0,
+                        eta: -1,
+                        updatedAt: Date.now(),
+                      }
+                    : j
+                )
+              );
+            } else if (data.type === 'torrent:removed') {
               setJobs((prev) => prev.filter((j) => j.id !== data.jobId));
             }
           } catch (err) {
@@ -713,7 +828,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
       try {
         const checkRunning = async (port: number) => {
           try {
-            const res = await fetch(`http://localhost:${port}/api/jobs`, { signal: AbortSignal.timeout(300) });
+            const res = await fetch(`http://127.0.0.1:${port}/api/jobs`, { signal: AbortSignal.timeout(300) });
             return res.ok;
           } catch {
             return false;
@@ -744,7 +859,7 @@ export function Dashboard({ mode, downloader, serverPort = 7474 }: DashboardProp
         }
 
         const os = process.platform;
-        const url = `http://localhost:${serverPort}`;
+        const url = `http://127.0.0.1:${serverPort}`;
         const { spawn } = await import('node:child_process');
         if (os === 'darwin') {
           spawn('open', [url], { stdio: 'ignore', detached: true }).unref();

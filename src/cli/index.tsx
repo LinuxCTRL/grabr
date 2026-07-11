@@ -18,7 +18,7 @@ import { loadConfig } from '../core/config';
 
 async function isDaemonRunning(port = 7474): Promise<boolean> {
   try {
-    const res = await fetch(`http://localhost:${port}/api/jobs`, {
+    const res = await fetch(`http://127.0.0.1:${port}/api/jobs`, {
       signal: AbortSignal.timeout(300),
     });
     return res.ok;
